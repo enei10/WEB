@@ -20,21 +20,28 @@ document.addEventListener("DOMContentLoaded", () => {
 
   d3.dsv(";", "data/tic_peru.csv").then(data => {
 
-    const mesesES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
-                     "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+    const mesesCortos = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+    const mesesLargos = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 
-    // Crear fechas reales
     data.forEach(d => {
-      const mesIndex = mesesES.indexOf(d.Mes);
+      const mesIndex = mesesLargos.indexOf(d.Mes);
       d.fecha = new Date(d.Año, mesIndex, 1);
     });
 
     const series = ["SOFTWARE", "BACKUP", "DATABASE"];
 
-    const x = d3.scaleTime()
-      .domain(d3.extent(data, d => d.fecha))
-      .range([0, width]);
+    // Extraer fechas únicas y ordenadas
+    const fechasUnicas = Array.from(new Set(data.map(d => d.fecha.getTime())))
+      .map(t => new Date(t))
+      .sort((a, b) => a - b);
 
+    // Escala X con spacing uniforme por fecha
+    const x = d3.scalePoint()
+      .domain(fechasUnicas.map(d => d.getTime()))
+      .range([0, width])
+      .padding(0.5);
+
+    // Escalas Y
     const yLeft = d3.scaleLinear()
       .domain([0, d3.max(data, d => Math.max(+d["BACKUP"], +d["DATABASE"]))])
       .nice()
@@ -45,32 +52,40 @@ document.addEventListener("DOMContentLoaded", () => {
       .nice()
       .range([height, 0]);
 
-    // Formato: "Julio 2021"
-    const formatTime = d => `${mesesES[d.getMonth()]} ${d.getFullYear()}`;
+    const formatTime = d => `${mesesCortos[d.getMonth()]} ${d.getFullYear()}`;
 
-    // Crear 6 fechas espaciadas automáticamente
-    const fechas = d3.scaleTime()
-      .domain(d3.extent(data, d => d.fecha))
-      .ticks(6);
+    // Calcular 6 fechas del dominio real
+    const fechasFinales = [];
+    const step = Math.floor((fechasUnicas.length - 1) / 5);
+    for (let i = 0; i <= 5; i++) {
+      fechasFinales.push(fechasUnicas[i * step].getTime());
+    }
 
     // Eje X
-    svg.append("g")
+    const ejeX = svg.append("g")
       .attr("transform", `translate(0, ${height})`)
-      .call(d3.axisBottom(x)
-        .tickValues(fechas)
-        .tickFormat(formatTime)
-      )
-      .selectAll("text")
-      .style("text-anchor", "middle")
-      .style("font-size", "12px")
-      .attr("dy", "1.5em");
+      .style("opacity", 0);
 
-    // Eje Y
+    ejeX.transition().duration(700).style("opacity", 1)
+      .call(d3.axisBottom(x)
+        .tickValues(fechasFinales)
+        .tickFormat(t => formatTime(new Date(t)))
+      );
+
+    ejeX.selectAll("text")
+      .style("text-anchor", "middle")
+      .style("font-size", "12px");
+
+    // Ejes Y
     svg.append("g")
+      .style("opacity", 0)
+      .transition().duration(700).style("opacity", 1)
       .call(d3.axisLeft(yLeft).ticks(6).tickFormat(d3.format(",.0f")));
 
     svg.append("g")
       .attr("transform", `translate(${width}, 0)`)
+      .style("opacity", 0)
+      .transition().duration(700).style("opacity", 1)
       .call(d3.axisRight(yRight).ticks(6).tickFormat(d3.format(",.0f")));
 
     const focusDots = {};
@@ -79,25 +94,15 @@ document.addEventListener("DOMContentLoaded", () => {
       const y = (key === "SOFTWARE") ? yRight : yLeft;
 
       const line = d3.line()
-        .x(d => x(d.fecha))
+        .x(d => x(d.fecha.getTime()))
         .y(d => y(+d[key]));
 
-      const path = svg.append("path")
+      svg.append("path")
         .datum(data)
         .attr("fill", "none")
         .attr("stroke", color(key))
         .attr("stroke-width", 2)
         .attr("d", line);
-
-      const totalLength = path.node().getTotalLength();
-
-      path
-        .attr("stroke-dasharray", `${totalLength} ${totalLength}`)
-        .attr("stroke-dashoffset", totalLength)
-        .transition()
-        .duration(1200)
-        .ease(d3.easeCubic)
-        .attr("stroke-dashoffset", 0);
 
       focusDots[key] = svg.append("circle")
         .attr("r", 4)
@@ -126,25 +131,21 @@ document.addEventListener("DOMContentLoaded", () => {
         series.forEach(k => focusDots[k].style("display", "none"));
       });
 
-    // Buscar fecha más cercana en el eje X
     function getClosestDate(mx) {
-      const bisectDate = d3.bisector(d => d.fecha).left;
-      const x0 = x.invert(mx);
-      const i = bisectDate(data, x0, 1);
-      return data[Math.min(i, data.length - 1)];
+      const x0 = mx;
+      const distances = fechasUnicas.map(d => Math.abs(x(d.getTime()) - x0));
+      const closestIndex = distances.indexOf(Math.min(...distances));
+      return data.find(d => d.fecha.getTime() === fechasUnicas[closestIndex].getTime());
     }
 
-    // Tooltip + línea flotante
     function mousemove(event) {
       const [mx] = d3.pointer(event);
       const d = getClosestDate(mx);
       if (!d) return;
 
-      const xCoord = x(d.fecha);
-      focusLine
-        .style("display", "block")
-        .attr("x1", xCoord)
-        .attr("x2", xCoord);
+      const xCoord = x(d.fecha.getTime());
+
+      focusLine.style("display", "block").attr("x1", xCoord).attr("x2", xCoord);
 
       series.forEach(key => {
         const y = (key === "SOFTWARE") ? yRight : yLeft;
@@ -166,24 +167,16 @@ document.addEventListener("DOMContentLoaded", () => {
         );
     }
 
-    // Leyenda
-    const legend = svg.append("g")
+    svg.append("g")
       .attr("transform", `translate(0, -20)`)
       .selectAll("g")
       .data(series)
       .enter()
       .append("g")
-      .attr("transform", (d, i) => `translate(${i * 120}, 0)`);
-
-    legend.append("rect")
-      .attr("width", 12)
-      .attr("height", 12)
-      .attr("fill", d => color(d));
-
-    legend.append("text")
-      .attr("x", 18)
-      .attr("y", 10)
-      .text(d => d)
-      .style("font-size", "13px");
+      .attr("transform", (d, i) => `translate(${i * 120}, 0)`)
+      .call(g => {
+        g.append("rect").attr("width", 12).attr("height", 12).attr("fill", d => color(d));
+        g.append("text").attr("x", 18).attr("y", 10).text(d => d).style("font-size", "13px");
+      });
   });
 });
