@@ -96,3 +96,11 @@ h2 {
   height: 400px;
   position: relative;
 }
+
+
+/* ################################ */
+#sunburst-chart svg {
+  max-width: 900px;
+  margin: auto;
+  display: block;
+}
