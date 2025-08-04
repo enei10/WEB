@@ -1,0 +1,40 @@
+Clasificacion;Categoria;Subcategoria;Valor
+B;B1-ACTIVA;;40
+B;B2-PASIVA;;60
+C;;;40
+D;Leisure;Hotels;40
+D;Leisure;Flights;60
+D;Leisure;Holiday;40
+D;Leisure;Food;10
+D;News and entertainment;News;50
+D;News and entertainment;Blogs;20
+D;News and entertainment;Vlogs;15
+D;News and entertainment;Games;30
+D;News and entertainment;Videos, music;62
+D;News and entertainment;Books;24
+D;News and entertainment;E-learning;52
+D;News and entertainment;Gambling;10
+D;News and entertainment;Adult;20
+D;Business;Advertising;25
+D;Business;Finance;39
+D;Business;Consultancy;64
+D;Business;Jobs;12
+D;Retail;Housing;58
+D;Retail;Tickets;67
+D;Retail;Auctions;68
+D;Retail;Online trade;59
+D;General Services;Dating;43
+D;General Services;Visualizations;40
+D;General Services;Transport;20
+D;General Services;Online payment;33
+D;General Services;Crowfunding;38
+E;Hosting and cloud;Webhosting;39
+E;Hosting and cloud;Cloud and Data services;24
+E;Websites and app;Website design;20
+E;Websites and app;App design;10
+E;Software;Software services;24
+E;Marketing and consultancy;Internet marketing;29
+E;Marketing and consultancy;Internet consultancy;38
+E;Infrastructure and cibersecurity;Infrastructure;57
+E;Infrastructure and cibersecurity;Firewalls;25
+E;Data Minig & Big Data;Dataminig & Big;68
