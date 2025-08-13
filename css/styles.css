@@ -104,3 +104,12 @@ h2 {
   margin: auto;
   display: block;
 }
+
+/* ###################### */
+
+#footprint .tooltip{
+  position:absolute; pointer-events:none;
+  padding:6px 8px; font:12px system-ui, sans-serif;
+  background:#fff; border:1px solid #ddd; border-radius:6px;
+  box-shadow:0 2px 10px rgba(0,0,0,.08); opacity:0;
+}
