@@ -23,7 +23,7 @@ const wrap = host.append("div")
 
 wrap.append("h2")
   .attr("style","text-align:center;margin:0 0 12px;")
-  .text("Bar‑Treemap (100%) por categoría");
+  .text("Trust Grade por categoría");
 
 const controls = wrap.append("div")
   .style("display","flex")
@@ -151,7 +151,7 @@ function drawBarTreemap(rows) {
   g.append("text")
     .attr("x",0).attr("y",-10)
     .attr("fill","#555").attr("font-weight",600)
-    .text("Composición (100% por categoría)");
+    .text("%");
 
   // Eje X con etiquetas PLANAS (0°)
   const xAxis = d3.axisBottom(x);
