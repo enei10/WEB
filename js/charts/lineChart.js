@@ -10,13 +10,17 @@ document.addEventListener("DOMContentLoaded", () => {
     .append("g")
     .attr("transform", `translate(${margin.left},${margin.top})`);
 
+  const series = ["SOFTWARE", "BACKUP", "DATABASE"];
+
   const color = d3.scaleOrdinal()
-    .domain(["SOFTWARE", "BACKUP", "DATABASE"])
+    .domain(series)
     .range(["#2b8cbe", "#4eb3d3", "#9e9ac8"]);
 
   const tooltip = d3.select("#line-chart-container")
     .append("div")
     .attr("class", "tooltip");
+
+  const fmt = d3.format(",.0f"); // formato para valores en tooltip
 
   d3.dsv(";", "data/tic_peru.csv").then(data => {
 
@@ -28,9 +32,7 @@ document.addEventListener("DOMContentLoaded", () => {
       d.fecha = new Date(d.Año, mesIndex, 1);
     });
 
-    const series = ["SOFTWARE", "BACKUP", "DATABASE"];
-
-    // Extraer fechas únicas y ordenadas
+    // Fechas únicas ordenadas
     const fechasUnicas = Array.from(new Set(data.map(d => d.fecha.getTime())))
       .map(t => new Date(t))
       .sort((a, b) => a - b);
@@ -145,7 +147,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const xCoord = x(d.fecha.getTime());
 
-      focusLine.style("display", "block").attr("x1", xCoord).attr("x2", xCoord);
+      focusLine
+        .style("display", "block")
+        .attr("x1", xCoord)
+        .attr("x2", xCoord);
 
       series.forEach(key => {
         const y = (key === "SOFTWARE") ? yRight : yLeft;
@@ -155,18 +160,31 @@ document.addEventListener("DOMContentLoaded", () => {
           .attr("cy", y(+d[key]));
       });
 
+      // === Tooltip con cuadrito del color de cada línea ===
+      const filas = series.map(k => `
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span style="
+            width:10px;height:10px;border-radius:2px;
+            background:${color(k)};
+            box-shadow:0 0 0 1px rgba(0,0,0,.2) inset;">
+          </span>
+          <span>${k}: <strong>${fmt(+d[k])}</strong></span>
+        </div>
+      `).join("");
+
       tooltip
         .style("display", "block")
         .style("left", (xCoord + margin.left + 20) + "px")
         .style("top", (margin.top + 10) + "px")
-        .html(
-          `<strong>${formatTime(d.fecha)}</strong><br>
-           SOFTWARE: ${d.SOFTWARE}<br>
-           BACKUP: ${d.BACKUP}<br>
-           DATABASE: ${d.DATABASE}`
-        );
+        .html(`
+          <div style="margin-bottom:4px;"><strong>${formatTime(d.fecha)}</strong></div>
+          <div style="display:flex;flex-direction:column;gap:3px;">
+            ${filas}
+          </div>
+        `);
     }
 
+    // (tu bloque de "mini leyenda" en el SVG, lo dejo igual por si lo usas)
     svg.append("g")
       .attr("transform", `translate(0, -20)`)
       .selectAll("g")
