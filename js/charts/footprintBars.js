@@ -8,7 +8,7 @@
     { key: "CAT B1", label: "B1", color: "#6a1b9a" }, // Passive presence
     { key: "CAT B2", label: "B2", color: "#2a9bd6" }, // Active presence
     { key: "CAT C",  label: "C",  color: "#d81b60" }, // E-commerce platform
-    { key: "CAT D",  label: "D",  color: "#cfd3d8" }, // Online services
+    { key: "CAT D",  label: "D",  color: "#be2da1ff" }, // Online services
     { key: "CAT E",  label: "E",  color: "#244c9a" }, // Internet-related ICT services
   ];
 
@@ -70,23 +70,23 @@
     .trim().toLowerCase();
 
   // === LEYENDA ===============================================================
-  const legend = host.append("div")
-    .attr("id","footprint-legend")
-    .style("display","flex")
-    .style("gap","14px")
-    .style("justify-content","center")
-    .style("align-items","center")
-    .style("margin","6px 0 12px");
+  // const legend = host.append("div")
+  //   .attr("id","footprint-legend")
+  //   .style("display","flex")
+  //   .style("gap","14px")
+  //   .style("justify-content","center")
+  //   .style("align-items","center")
+  //   .style("margin","6px 0 12px");
 
-  legend.selectAll("div")
-    .data(CATS)
-    .join("div")
-    .style("display","flex")
-    .style("align-items","center")
-    .html(d => `
-      <span style="display:inline-block;width:12px;height:12px;margin-right:6px;border-radius:2px;background:${d.color}"></span>
-      <span style="font:12px system-ui,sans-serif">${d.label}</span>
-    `);
+  // legend.selectAll("div")
+  //   .data(CATS)
+  //   .join("div")
+  //   .style("display","flex")
+  //   .style("align-items","center")
+  //   .html(d => `
+  //     <span style="display:inline-block;width:12px;height:12px;margin-right:6px;border-radius:2px;background:${d.color}"></span>
+  //     <span style="font:12px system-ui,sans-serif">${d.label}</span>
+  //   `);
 
   // === CARGA DE DATOS ========================================================
   d3.dsv(SEP, CSV_PATH, d3.autoType).then(raw => {
