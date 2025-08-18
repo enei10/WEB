@@ -1,64 +1,60 @@
 // js/charts/footprintBars.js
-(function(){
+(function () {
   const CSV_PATH = "data/footprint.csv";   // ajusta si tu ruta es otra
   const SEP = ";";
 
-  // Orden y nombres (B1, B2, C, D, E)
+  // Categorías en orden visual B1..E
   const CATS = [
-    { key: "CAT B1", label: "B1", color: "#6a1b9a" }, // Passive presence
-    { key: "CAT B2", label: "B2", color: "#2a9bd6" }, // Active presence
-    { key: "CAT C",  label: "C",  color: "#d81b60" }, // E-commerce platform
-    { key: "CAT D",  label: "D",  color: "#be2da1ff" }, // Online services
-    { key: "CAT E",  label: "E",  color: "#244c9a" }, // Internet-related ICT services
+    { key: "CAT B1", label: "B1", color: "#6a1b9a" }, // Presencia pasiva
+    { key: "CAT B2", label: "B2", color: "#2a9bd6" }, // Presencia activa
+    { key: "CAT C",  label: "C",  color: "#d81b60" }, // Tiendas en línea
+    { key: "CAT D",  label: "D",  color: "#be2da1" }, // Servicios en línea
+    { key: "CAT E",  label: "E",  color: "#244c9a" }, // Servicios TIC
   ];
 
-  const margin = { top: 30, right: 20, bottom: 60, left: 80 };
-  const width  = 720;
-  const height = 420;
-
-  // Contenedor raíz (tu HTML ya tiene <div id="footprint"><h2>...</h2></div>)
+  // --------- Layout base (sin selects locales) ----------
   const host = d3.select("#footprint");
   if (host.empty()) return;
 
-  // Limpia elementos dinámicos
-  host.selectAll("#footprint-controls, #footprint-bars, #footprint-legend, .tooltip").remove();
+  host.selectAll("*").remove(); // limpiar
 
-  // Controles (creados por JS)
-  const controls = host.append("div")
-    .attr("id", "footprint-controls")
-    .style("display","flex")
-    .style("gap","12px")
-    .style("justify-content","center")
-    .style("align-items","center")
-    .style("margin-bottom","12px");
+  const margin = { top: 30, right: 20, bottom: 60, left: 80 };
+  const width  = host.node().clientWidth || 720;
+  const height = 420;
 
-  controls.append("label").attr("for","fp-year").text("Año:");
-  const yearSel = controls.append("select").attr("id","fp-year");
+  const wrap = host.append("div")
+    .attr("id", "footprint-bars")
+    .style("position", "relative");
 
-  controls.append("label").attr("for","fp-month").text("Mes:");
-  const monthSel = controls.append("select").attr("id","fp-month");
+  const svg = wrap.append("svg")
+    .attr("viewBox", `0 0 ${width} ${height}`)
+    .attr("preserveAspectRatio", "xMidYMid meet")
+    .style("width", "100%")
+    .style("height", "auto");
 
-  // Área de gráfico
-  const wrap = host.append("div").attr("id","footprint-bars").style("position","relative");
-  const svg = wrap.append("svg").attr("width", width).attr("height", height);
   const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
 
   const innerW = width  - margin.left - margin.right;
   const innerH = height - margin.top  - margin.bottom;
 
-  // Tooltip
-  const tooltip = host.append("div").attr("class","tooltip");
+  const tooltip = host.append("div").attr("class", "tooltip");
 
-  // Escalas y ejes
-  const x = d3.scaleBand().domain(CATS.map(c => c.label)).range([0, innerW]).padding(0.25);
-  const yScale = d3.scaleLinear().range([innerH, 0]).nice();
+  const x = d3.scaleBand()
+    .domain(CATS.map(c => c.label))
+    .range([0, innerW])
+    .padding(0.25);
 
-  g.append("g").attr("transform", `translate(0,${innerH})`).call(d3.axisBottom(x).tickSizeOuter(0));
+  const y = d3.scaleLinear().range([innerH, 0]).nice();
+
+  g.append("g")
+    .attr("transform", `translate(0,${innerH})`)
+    .call(d3.axisBottom(x).tickSizeOuter(0));
+
   const yAxisG = g.append("g");
   yAxisG.append("text")
     .attr("x", 0).attr("y", -12)
     .attr("fill", "#333").attr("font-weight", "600")
-    .attr("text-anchor","start")
+    .attr("text-anchor", "start")
     .text("Footprint promedio");
 
   const barsG   = g.append("g");
@@ -69,119 +65,100 @@
     .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
     .trim().toLowerCase();
 
-  // === LEYENDA ===============================================================
-  // const legend = host.append("div")
-  //   .attr("id","footprint-legend")
-  //   .style("display","flex")
-  //   .style("gap","14px")
-  //   .style("justify-content","center")
-  //   .style("align-items","center")
-  //   .style("margin","6px 0 12px");
-
-  // legend.selectAll("div")
-  //   .data(CATS)
-  //   .join("div")
-  //   .style("display","flex")
-  //   .style("align-items","center")
-  //   .html(d => `
-  //     <span style="display:inline-block;width:12px;height:12px;margin-right:6px;border-radius:2px;background:${d.color}"></span>
-  //     <span style="font:12px system-ui,sans-serif">${d.label}</span>
-  //   `);
-
-  // === CARGA DE DATOS ========================================================
+  // --------- Carga y normalización de datos ----------
   d3.dsv(SEP, CSV_PATH, d3.autoType).then(raw => {
-    // Normaliza números con coma decimal
-    const data = raw.map(d => {
-      const row = { ...d };
-      for (const c of CATS) {
-        const v = String(d[c.key]).replace(/\./g,"").replace(",",".");
-        row[c.key] = +v;
-      }
-      return row;
-    });
+    if (!raw || !raw.length) return;
 
-    // Años y meses
-    const years = Array.from(new Set(data.map(d => d["Año"]))).sort(d3.ascending);
-    yearSel.selectAll("option").data(years).join("option")
-      .attr("value", d => d).text(d => d);
-    yearSel.property("value", years[0]);
+    // Detectar claves reales para Año/Mes
+    const sample   = raw[0];
+    const yearKey  = ["Año","Ano","Year"].find(k => k in sample)  || "Año";
+    const monthKey = ["Mes","Month"].find(k => k in sample)        || "Mes";
 
-    function monthsForYear(year){
-      return Array.from(new Set(data.filter(d => d["Año"] === +year).map(d => d["Mes"])));
+    const toNumber = (x) => {
+      if (x == null || x === "") return 0;
+      return +String(x).replace(/\./g, "").replace(",", ".");
+    };
+    // Lee desde "CAT B1" o, si no existe, desde "B1"
+    const pickVal = (row, catKey, fallbackLabel) =>
+      toNumber(row[catKey] ?? row[fallbackLabel] ?? 0);
+
+    // Estructura normalizada
+    const data = raw.map(d => ({
+      year:  +d[yearKey],
+      month: String(d[monthKey]).trim(),
+      ...Object.fromEntries(CATS.map(c => [c.key, pickVal(d, c.key, c.label)]))
+    }));
+
+    // Índices de (año,mes) disponibles
+    const years = Array.from(new Set(data.map(d => d.year))).filter(Number.isFinite).sort((a,b)=>a-b);
+    const monthsByYear = new Map(years.map(y => [y, Array.from(new Set(data.filter(d=>d.year===y).map(d=>d.month)))]));
+    let currentYear  = undefined;
+    let currentMonth = undefined;
+
+    // --------- Render ----------
+    function rowFor(yval, mval) {
+      return data.find(d => d.year === +yval && norm(d.month) === norm(mval)) || null;
     }
-    function setMonths(year){
-      const months = monthsForYear(year);
-      monthSel.selectAll("option").data(months).join("option")
-        .attr("value", d => d).text(d => d);
-      monthSel.property("value", months[0] || "");
-    }
-    setMonths(years[0]);
 
-    function rowFor(year, month){
-      return data.find(d => d["Año"] === +year && norm(d["Mes"]) === norm(month)) || null;
-    }
-
-    function update(year, month){
-      const row = rowFor(year, month);
+    function update(yval, mval) {
+      const row = rowFor(yval, mval);
       const series = CATS.map(cat => ({
-        ...cat,
-        value: row && Number.isFinite(row[cat.key]) ? row[cat.key] : 0
+        key: cat.key,
+        label: cat.label,
+        color: cat.color,
+        value: row ? (Number.isFinite(row[cat.key]) ? row[cat.key] : 0) : 0
       }));
 
-      // Escala Y dinámica
       const maxVal = d3.max(series, d => d.value) || 0;
-      yScale.domain([0, maxVal ? maxVal * 1.15 : 1]).nice();
-      yAxisG.transition().duration(600).call(d3.axisLeft(yScale));
+      y.domain([0, maxVal ? maxVal * 1.15 : 1]).nice();
+      yAxisG.transition().duration(500).call(d3.axisLeft(y));
 
-      // Barras
       const bars = barsG.selectAll("rect").data(series, d => d.key);
 
       bars.enter().append("rect")
-          .attr("x", d => x(d.label))
-          .attr("width", x.bandwidth())
-          .attr("y", yScale(0))
-          .attr("height", innerH - yScale(0))
-          .attr("fill", d => d.color)
+        .attr("x", d => x(d.label))
+        .attr("width", x.bandwidth())
+        .attr("y", y(0))
+        .attr("height", 0)
+        .attr("fill", d => d.color)
         .merge(bars)
-          .transition().duration(700).ease(d3.easeCubic)
-          .attr("x", d => x(d.label))
-          .attr("width", x.bandwidth())
-          .attr("y", d => yScale(d.value))
-          .attr("height", d => innerH - yScale(d.value));
+        .transition().duration(650).ease(d3.easeCubic)
+        .attr("x", d => x(d.label))
+        .attr("width", x.bandwidth())
+        .attr("y", d => y(d.value))
+        .attr("height", d => innerH - y(d.value));
 
       bars.exit().remove();
 
-      // Labels de valor (normales, NO rotados)
       const labels = labelsG.selectAll("text").data(series, d => d.key);
 
       labels.enter().append("text")
-          .attr("text-anchor","middle")
-          .attr("font-size","12px")
-          .attr("fill","#111")
-          .attr("x", d => x(d.label) + x.bandwidth()/2)
-          .attr("y", yScale(0) - 6)
-          .text(d => fmt(d.value))
+        .attr("text-anchor", "middle")
+        .attr("font-size", "12px")
+        .attr("fill", "#111")
+        .attr("x", d => x(d.label) + x.bandwidth() / 2)
+        .attr("y", y(0) - 6)
+        .text(d => fmt(d.value))
         .merge(labels)
-          .transition().duration(700).ease(d3.easeCubic)
-          .attr("x", d => x(d.label) + x.bandwidth()/2)
-          .attrTween("y", function(d){
-            const start = +this.getAttribute("data-y") || (yScale(0) - 6);
-            const it = d3.interpolateNumber(start, yScale(d.value) - 6);
-            return t => {
-              const ty = it(t);
-              this.setAttribute("data-y", ty);
-              return ty;
-            };
-          })
-          .tween("text", function(d){
-            const start = parseFloat(this.textContent.replace(",", ".")) || 0;
-            const i = d3.interpolateNumber(start, d.value);
-            return t => this.textContent = fmt(i(t));
-          });
+        .transition().duration(650).ease(d3.easeCubic)
+        .attr("x", d => x(d.label) + x.bandwidth() / 2)
+        .attrTween("y", function (d) {
+          const start = +this.getAttribute("data-y") || (y(0) - 6);
+          const it = d3.interpolateNumber(start, y(d.value) - 6);
+          return t => {
+            const ty = it(t);
+            this.setAttribute("data-y", ty);
+            return ty;
+          };
+        })
+        .tween("text", function (d) {
+          const start = parseFloat(this.textContent.replace(",", ".")) || 0;
+          const i = d3.interpolateNumber(start, d.value);
+          return t => this.textContent = fmt(i(t));
+        });
 
       labels.exit().remove();
 
-      // Tooltip
       barsG.selectAll("rect")
         .on("mousemove", (event, d) => {
           const [px, py] = d3.pointer(event, host.node());
@@ -191,21 +168,37 @@
             .style("opacity", 1)
             .html(`
               <div style="font-weight:600;margin-bottom:2px;">Categoría ${d.label}</div>
-              <div>Año: <b>${year}</b> &nbsp; Mes: <b>${month}</b></div>
+              <div>Año: <b>${yval}</b> &nbsp; Mes: <b>${mval}</b></div>
               <div>Footprint: <b>${fmt(d.value)}</b></div>
             `);
         })
         .on("mouseleave", () => tooltip.style("opacity", 0));
     }
 
-    // Render inicial y eventos
-    update(yearSel.property("value"), monthSel.property("value"));
-    yearSel.on("change", function(){
-      setMonths(this.value);
-      update(this.value, monthSel.property("value"));
+    // --------- Integración con Filtro Global ----------
+    // 1) Si llega filtro global, lo usamos
+    window.FilterBus?.subscribe(({ year, month }) => {
+      if (year == null || !month) return;
+      currentYear  = year;
+      currentMonth = month;
+      update(currentYear, currentMonth);
     });
-    monthSel.on("change", function(){
-      update(yearSel.property("value"), this.value);
-    });
+
+    // 2) Si NO ha llegado filtro global aún, dibuja con el primer (año,mes) disponible
+    if (currentYear == null || !currentMonth) {
+      const y0 = years[0];
+      const m0 = (monthsByYear.get(y0) || [])[0];
+      if (y0 != null && m0) {
+        currentYear = y0;
+        currentMonth = m0;
+        update(currentYear, currentMonth);
+      }
+    }
+
+    // 3) Redibujar al cambiar el tamaño del contenedor (opcional simple)
+    window.addEventListener("resize", () => {
+      // el SVG es responsive por viewBox; no recalculamos escalas aquí
+      // si quisieras recalcular x con nuevo ancho, habría que medir de nuevo y rehacer escalas
+    }, { passive: true });
   });
 })();
