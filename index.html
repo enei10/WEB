@@ -2,57 +2,100 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <title>Gráfico apilado</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dashboard</title>
   <link rel="stylesheet" href="css/styles.css" />
 </head>
 <body>
-  <h2 style="text-align: center;">Disponibilidad de páginas web</h2>
-  <div id="bar-chart-container"></div>
 
-  <div id="sunburst">
-    <h2 style="text-align: center;">Clasificación de páginas webs según su actividad en línea</h2>
-    <div id="sunburst-chart"></div>
-  </div>
+  <!-- Filtro global -->
+  <div id="global-filter-panel" class="global-filters"></div>
 
-  <div id="footprint">
-    <h2 style="text-align:center;">Economic Footprint por categoría</h2>
-  </div>
+  <!-- DASHBOARD GRID -->
+  <main class="dash-grid">
 
-  <div id="stacked-chart">
-    <h2 style="text-align: center;">Heartbeat por categoría</h2>
-    <div id="stacked-selector" style="text-align: center; margin-bottom: 1rem;"></div>
-    <!-- ####<div id="stacked-legend"></div>#### -->
-  </div>
+    <!-- Card grande izquierda -->
+    <section class="card card-xl">
+      <header class="card-hd">
+        <h2>Clasificación de páginas webs según su actividad en línea</h2>
+      </header>
+      <div class="card-bd">
+        <div id="sunburst-chart"></div>
+      </div>
+    </section>
 
-  <div id="linechart-categoria">
-    <h2>Tendencia del Heartbeat</h2>
-    <div id="linechart-selector"></div>
-    <div id="linechart-categoria-svg"></div>
-  </div>
+    <!-- Cards pequeñas -->
+    <section class="card">
+      <header class="card-hd"><h3>Heartbeat por categoría</h3></header>
+      <div class="card-bd">
+        <div id="stacked-chart">
+          <!-- placeholder usado por el script -->
+          <div id="stacked-selector" style="text-align:center;margin-bottom:.75rem;"></div>
+        </div>
+      </div>
+    </section>
 
-  <div id="bar-treemap">
-    <h2 style="text-align: center;">Trust Grade por categoría</h2>
+    <section class="card">
+      <header class="card-hd"><h3>Trust Grade por categoría</h3></header>
+      <div class="card-bd"><div id="bar-treemap"></div></div>
+    </section>
 
-  </div>
+    <!-- <section class="card">
+      <header class="card-hd"><h3>Servicios TIC: Software, Backup y Database</h3></header>
+      <div class="card-bd"><div id="line-chart-container"></div></div>
+    </section> -->
 
+    <section class="card">
+      <header class="card-hd"><h3>Tendencia del Heartbeat</h3></header>
+      <div class="card-bd">
+        <div id="linechart-categoria">
+          <!-- placeholders usados por el script -->
+          <div id="linechart-selector"></div>
+          <div id="linechart-categoria-svg"></div>
+        </div>
+      </div>
+    </section>
 
-  <div id="chatbot">
-    <h2 style="text-align: center;">Chatbots en páginas .gob.pe</h2>
-    <div id="chatbot-chart"></div>
-  </div>
+    <section class="card card-wide">
+      <header class="card-hd"><h3>Chatbots en páginas .gob.pe</h3></header>
+      <div class="card-bd"><div id="chatbot-chart"></div></div>
+    </section>
 
-  <!-- D3.js -->
+    <section class="card">
+      <header class="card-hd"><h3>Economic Footprint por categoría</h3></header>
+      <div class="card-bd"><div id="footprint"></div></div>
+    </section>
+
+    <section class="card">
+      <header class="card-hd"><h3>Disponibilidad de páginas web</h3></header>
+      <div class="card-bd"><div id="bar-chart-container"></div></div>
+    </section>
+
+    <section class="card">
+      <header class="card-hd"><h3>Semicírculo de páginas</h3></header>
+      <div class="card-bd"><div id="semi-donut"></div></div>
+    </section>
+
+  </main>
+
+  <!-- Scripts (orden correcto) -->
   <script src="lib/d3.min.js"></script>
+  <script src="js/core/filterBus.js"></script>
+  <script src="js/core/dateUtils.js"></script>
+  <script src="js/core/availability.js"></script>
+  <script src="js/core/globalFilters.js"></script>
+  <script src="js/main.js"></script>
 
-  <!-- Scripts separados -->
-  <script src="js/charts/barChart.js"></script>
-  <script src="js/charts/lineChart.js"></script>
-  <script src="js/charts/stackedChart.js"></script>
-  <script src="js/charts/lineChartCategoria.js"></script>
+  <!-- Charts -->
+  <!-- <script src="js/charts/stackedEqualWidth.js"></script> -->
   <script src="js/charts/sunburstChart.js"></script>
+  <script src="js/charts/lineChartCategoria.js"></script>
+  <script src="js/charts/barChart.js"></script>
   <script src="js/charts/chatbot.js"></script>
-  <script src="js/charts/footprintBars.js"></script>
   <script src="js/charts/barTreemap.js"></script>
-
+  <script src="js/charts/stackedChart.js"></script>
+  <script src="js/charts/footprintBars.js"></script>
+  <script src="js/charts/semiDonut.js"></script>
+  <!-- <script src="js/charts/lineChart.js"></script> -->
 </body>
 </html>
