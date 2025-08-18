@@ -26,8 +26,8 @@ h2 {
 /* === BARCHART === */
 #bar-chart-container {
   width: 100%;
-  max-width: 1000px;
-  margin: auto;
+  max-width: none;   /* ✅ sin tope */
+  margin: 0 auto;
   position: relative;
 }
 
@@ -71,7 +71,7 @@ h2 {
 /* === STACKED CHART === */
 #stacked-chart {
   width: 100%;
-  max-width: 1000px;
+  max-width: none;   /* ✅ sin tope */
   margin: 0 auto;
   text-align: center;
   position: relative;
@@ -115,14 +115,14 @@ h2 {
 /* === LINECHART-CATEGORIA === */
 #linechart-categoria {
   width: 100%;
-  max-width: 1000px;
+  max-width: none;   /* ✅ sin tope */
   margin: 2rem auto;
   text-align: center;
 }
 
 #linechart-categoria-svg {
   width: 100%;
-  height: 400px;
+  min-height: 400px; /* evita reservar espacio vacío si no hay SVG */
   position: relative;
 }
 
@@ -172,3 +172,79 @@ h2 {
   border-radius: 2px;
   box-shadow: 0 0 0 1px rgba(0,0,0,.1) inset;
 }
+
+/* Panel global arriba-derecha */
+.global-filters{
+  position: fixed; top: 12px; right: 16px; z-index: 1000;
+  display: flex; align-items: center; gap: 8px;
+  background: rgba(255,255,255,0.96);
+  border: 1px solid #e5e7eb; border-radius: 10px;
+  padding: 8px 10px; box-shadow: 0 2px 10px rgba(0,0,0,.06);
+  font: 12px/1.2 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+}
+.global-filters select{ padding: 4px 6px; border:1px solid #d1d5db; border-radius:8px; }
+
+/* Ocultar filtros locales, mantener leyendas */
+.sunburst-controls,
+.stacked-controls,
+#fp-year, #fp-month,
+#selMes, #selAnio,
+#bt-year, #bt-month { display: none !important; }
+
+
+
+/* ===== Grid principal ===== */
+.dash-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;   /* espacio vertical entre gráficos */
+}
+
+/* Cards */
+.card{
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  box-shadow: 0 1px 6px rgba(0,0,0,.06);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+.card-xl{ grid-column: 1 / span 2; grid-row: 1 / span 2; min-height: 460px; }
+.card-wide{ grid-column: 5 / span 1; grid-row: 1 / span 2; min-height: 460px; }
+
+.card-hd{ padding: 12px 14px 0; }
+.card-hd h2, .card-hd h3{ margin: 0; font-size: 16px; }
+.card-bd{ padding: 6px 10px 12px; height: 100%; }
+.card-bd > div{ height: 100%; }
+
+/* Oculta H2 internos que algunos charts inyectan dentro del contenedor */
+.card-bd > div > h2 { display: none; }
+
+/* Panel global arriba-derecha */
+.global-filters{
+  position: fixed; top: 12px; right: 16px; z-index: 1000;
+  display:flex; gap:8px; align-items:center;
+  background:#fff; border:1px solid #e5e7eb; border-radius:10px;
+  padding:8px 10px; box-shadow:0 2px 10px rgba(0,0,0,.06);
+  font: 12px/1.2 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+}
+.global-filters select{ padding: 4px 6px; border:1px solid #d1d5db; border-radius:8px; }
+
+/* Responsivo */
+@media (max-width: 1200px){
+  .dash-grid{ grid-template-columns: 1.6fr 1fr 1fr; }
+  .card-xl{ grid-column: 1 / span 3; grid-row: auto / span 1; }
+  .card-wide{ grid-column: 1 / span 3; grid-row: auto / span 1; }
+}
+@media (max-width: 720px){
+  .dash-grid{ grid-template-columns: 1fr; }
+  .card-xl, .card-wide{ grid-column: 1; }
+}
+
+/* Ocultar TODOS los selects locales Año/Mes y sus labels */
+#selMes, #selAnio, #bt-year, #bt-month, #fp-year, #fp-month,
+.stacked-controls, .sunburst-controls,
+.bar-treemap-wrap label { display: none !important; }
+
+/* Asegura posicionamiento del tooltip del Heartbeat dentro de su card */
+#stacked-chart { position: relative; }
