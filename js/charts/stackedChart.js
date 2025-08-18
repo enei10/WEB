@@ -1,13 +1,17 @@
 document.addEventListener("DOMContentLoaded", () => {
   const margin = { top: 40, right: 30, bottom: 60, left: 120 };
-  const width = 900 - margin.left - margin.right;
+  const width = (d3.select("#stacked-chart").node().clientWidth || 900) - margin.left - margin.right;
+
   const height = 400 - margin.top - margin.bottom;
 
-  const svg = d3.select("#stacked-chart")
+  const svgRoot = d3.select("#stacked-chart")
     .append("svg")
-    .attr("width", width + margin.left + margin.right)
-    .attr("height", height + margin.top + margin.bottom)
-    .append("g")
+    .attr("viewBox", `0 0 ${width + margin.left + margin.right} ${height + margin.top + margin.bottom}`)
+    .attr("preserveAspectRatio", "xMidYMid meet")
+    .style("width", "100%")
+    .style("height", "auto");
+
+  const svg = svgRoot.append("g")
     .attr("transform", `translate(${margin.left},${margin.top})`);
 
   // ===== Niveles / colores (orden fijo) =====
@@ -33,7 +37,11 @@ document.addEventListener("DOMContentLoaded", () => {
     .style("font", "12px/1.2 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif");
 
   // ===== Datos =====
-  d3.dsv(";", "data/heartbeat.csv", d3.autoType).then(data => {
+  d3.dsv(";", "data/heartbeat.csv", d => {
+    d = d3.autoType(d);
+    d.Mes = String(d.Mes).trim();   // 🔴 crítico para que coincida con el filtro global
+    return d;
+  }).then(data => {
     const selectorWrap = d3.select("#stacked-selector");
 
     const ordenMeses = [
@@ -55,6 +63,19 @@ document.addEventListener("DOMContentLoaded", () => {
       .attr("id", "selAnio")
       .on("change", () => updateChart(true));
     selAnio.selectAll("option").data(anios).enter().append("option").text(d => d);
+
+    // === Sincronizar con filtro global ===
+    FilterBus?.subscribe(({year, month}) => {
+      if (year == null || !month) return;
+      selAnio.property("value", year);
+      selMes.property("value", month);
+      updateChart(true);
+    });
+
+    // Ocultar selectores locales
+    d3.select("#selMes").style("display","none");
+    d3.select("#selAnio").style("display","none");
+
 
     // ===== Leyenda (click -> toggle SIN tachado) =====
     d3.select("#stacked-legend").remove();
