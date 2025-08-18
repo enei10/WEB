@@ -1,13 +1,19 @@
 document.addEventListener("DOMContentLoaded", () => {
   const margin = { top: 60, right: 30, bottom: 50, left: 70 };
-  const width = 900 - margin.left - margin.right;
+  const width = (d3.select("#linechart-categoria-svg").node().clientWidth 
+               || d3.select("#linechart-categoria").node().clientWidth 
+               || 900) - margin.left - margin.right;
+
   const height = 400 - margin.top - margin.bottom;
 
-  const svg = d3.select("#linechart-categoria")
+  const svgRoot = d3.select("#linechart-categoria-svg")
     .append("svg")
-    .attr("width", width + margin.left + margin.right)
-    .attr("height", height + margin.top + margin.bottom)
-    .append("g")
+    .attr("viewBox", `0 0 ${width + margin.left + margin.right} ${height + margin.top + margin.bottom}`)
+    .attr("preserveAspectRatio", "xMidYMid meet")
+    .style("width", "100%")
+    .style("height", "auto");
+
+  const svg = svgRoot.append("g")
     .attr("transform", `translate(${margin.left},${margin.top})`);
 
   const color = d3.scaleOrdinal()
@@ -124,23 +130,23 @@ document.addEventListener("DOMContentLoaded", () => {
         });
 
       // Actualizar todas las líneas (nuevas y antiguas)
-      grupos.merge(nuevos).select("path")
+      svg.selectAll(".line-group").select("path")
+        .interrupt()
         .transition()
         .duration(200)
         .ease(d3.easeCubic)
         .attr("stroke", d => color(d.nivel))
         .attr("d", d => line(d.valores))
-        .attr("stroke-dasharray", function() {
-          const totalLength = this.getTotalLength();
-          return `${totalLength} ${totalLength}`;
-        })
-        .attr("stroke-dashoffset", function() {
-          return this.getTotalLength();
-        })
-        .transition()
-        .duration(1200)
-        .ease(d3.easeCubic)
-        .attr("stroke-dashoffset", 0);
+        .on("end", function() {
+          const L = this.getTotalLength();
+          d3.select(this)
+            .attr("stroke-dasharray", `${L} ${L}`)
+            .attr("stroke-dashoffset", L)
+            .transition()
+            .duration(1200)
+            .ease(d3.easeCubic)
+            .attr("stroke-dashoffset", 0);
+        });
 
       legend.selectAll(".legend-item").remove();
 
