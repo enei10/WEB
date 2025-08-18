@@ -3,8 +3,8 @@ async function drawSunburst() {
   const container = d3.select("#sunburst-chart");
 
   // Crear filtros únicos
-  const anos = [...new Set(rawData.map(d => d.Ano))];
-  const meses = [...new Set(rawData.map(d => d.Mes))];
+  const anos  = Array.from(new Set(rawData.map(d => d.Ano)));
+  const meses = Array.from(new Set(rawData.map(d => d.Mes)));
 
   // Crear selects
   const controlDiv = container.insert("div", ":first-child").attr("class", "sunburst-controls").style("margin-bottom", "1rem");
@@ -32,6 +32,17 @@ async function drawSunburst() {
   // Dibujar por primera vez
   updateChart();
 
+  // Sincronizar con filtro global y ocultar selects locales
+  FilterBus.subscribe(({year, month}) => {
+    if (year == null || !month) return;
+    anoSelect.property("value", year);
+    mesSelect.property("value", month);
+    updateChart();
+  });
+  controlDiv.style("display", "none");
+
+
+
   function updateChart() {
     const selectedAno = anoSelect.property("value");
     const selectedMes = mesSelect.property("value");
@@ -48,8 +59,9 @@ async function drawSunburst() {
       .sum(d => d.value)
       .sort((a, b) => b.value - a.value);
 
-    const width = 928;
-    const radius = width / 6;
+    const cardW = container.node().closest('.card')?.clientWidth || container.node().clientWidth || 928;
+    const width = cardW;     // limita para que no desborde la card
+    const radius = width / 7;
     const color = d3.scaleOrdinal(d3.quantize(d3.interpolateRainbow, rootData.children.length + 1));
 
     const root = d3.partition()
