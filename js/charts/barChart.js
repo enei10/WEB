@@ -1,13 +1,17 @@
 document.addEventListener("DOMContentLoaded", () => {
   const margin = { top: 40, right: 30, bottom: 80, left: 70 };
-  const width = 900 - margin.left - margin.right;
+  const width = (d3.select("#bar-chart-container").node().clientWidth || 900) - margin.left - margin.right;
+
   const height = 500 - margin.top - margin.bottom;
 
-  const svg = d3.select("#bar-chart-container")
+  const svgRoot = d3.select("#bar-chart-container")
     .append("svg")
-    .attr("width", width + margin.left + margin.right)
-    .attr("height", height + margin.top + margin.bottom)
-    .append("g")
+    .attr("viewBox", `0 0 ${width + margin.left + margin.right} ${height + margin.top + margin.bottom}`)
+    .attr("preserveAspectRatio", "xMidYMid meet")
+    .style("width", "100%")
+    .style("height", "auto");
+
+  const svg = svgRoot.append("g")
     .attr("transform", `translate(${margin.left},${margin.top})`);
 
   const tooltip = d3.select("#bar-chart-container")
@@ -83,7 +87,8 @@ document.addEventListener("DOMContentLoaded", () => {
         });
 
     item.append("span")
-        .style("background-color", color(key));
+      .attr("class","swatch")
+      .style("background-color", color(key));
 
     item.append("label")
         .text(key);
