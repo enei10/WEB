@@ -3,13 +3,16 @@ document.addEventListener("DOMContentLoaded", async () => {
   const container = d3.select("#chatbot-chart");
 
   const margin = { top: 48, right: 28, bottom: 48, left: 56 };
-  const width = 920 - margin.left - margin.right;
+  const width = (d3.select("#chatbot-chart").node().clientWidth || 920) - margin.left - margin.right;
+
+
   const height = 420 - margin.top - margin.bottom;
 
-  const svg = container
-    .append("svg")
-    .attr("width", width + margin.left + margin.right)
-    .attr("height", height + margin.top + margin.bottom);
+  const svg = container.append("svg")
+    .attr("viewBox", `0 0 ${width + margin.left + margin.right} ${height + margin.top + margin.bottom}`)
+    .attr("preserveAspectRatio", "xMidYMid meet")
+    .style("width", "100%")
+    .style("height", "auto");
 
   const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
 
@@ -50,7 +53,10 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // Escalas
   const x = d3.scaleBand().domain(dataRaw.map(d => d.fecha)).range([0, width]).padding(0.2);
-  const yMax = d3.max(dataRaw, d => Math.max(d.Total ?? 0, ...seriesKeys.map(k => +d[k] || 0)));
+  const yMax = d3.max(dataRaw, d => {
+    const sMax = d3.max(seriesKeys, k => +d[k] || 0) || 0;
+    return Math.max(d.Total ?? 0, sMax);
+  });
   const y = d3.scaleLinear().domain([0, yMax]).nice().range([height, 0]);
 
   // Colores vivos para líneas
