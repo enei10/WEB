@@ -133,6 +133,73 @@ h2 {
   display: block;
 }
 
+/* === SEMIDONUT === */
+#semi-donut{
+  position: relative;           /* <- Necesario para posicionar el tooltip dentro del card */
+  width: 100%;
+  height: 100%;
+}
+
+/* Tooltip del semicírculo (coincide con estilo general) */
+#semi-donut .chart-tooltip{
+  position: absolute;
+  background: #fff;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  padding: 8px 12px;
+  box-shadow: 0 2px 6px rgba(0,0,0,.18);
+  font-size: 13px;
+  line-height: 1.25;
+  pointer-events: none;
+  opacity: 0;                 /* se maneja desde JS */
+  transition: opacity .15s ease;
+  z-index: 10;                /* para que quede encima del SVG */
+  white-space: nowrap;        /* evita salto de línea */
+}
+
+/* Contenedor del semicírculo: posiciona el tooltip dentro del card */
+#semi-donut{
+  position: relative;
+  width: 100%;
+  height: 100%;
+  /* evita que el scroll del móvil se “robe” el gesto de arrastre */
+  touch-action: none;
+}
+
+/* El SVG escala responsivo y no deja espacios raros */
+#semi-donut svg{
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* Tooltip del semicírculo */
+#semi-donut .chart-tooltip{
+  position: absolute;
+  background: #fff;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  padding: 8px 12px;
+  box-shadow: 0 2px 6px rgba(0,0,0,.18);
+  font-size: 13px;
+  line-height: 1.25;
+  pointer-events: none;
+  opacity: 0;             /* se maneja desde JS */
+  transition: opacity .15s ease;
+  z-index: 10;
+  white-space: nowrap;
+}
+
+/* Feedback visual al usuario cuando puede arrastrar */
+#semi-donut .spin-ring{ cursor: grab; }
+#semi-donut .spin-ring:active{ cursor: grabbing; }
+
+/* Evita seleccionar texto del título mientras arrastras sobre el SVG */
+#semi-donut, #semi-donut *{
+  user-select: none;
+}
+
+
 /* ###################### */
 #footprint .tooltip {
   position:absolute; 
