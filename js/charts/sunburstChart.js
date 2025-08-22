@@ -41,8 +41,6 @@ async function drawSunburst() {
   });
   controlDiv.style("display", "none");
 
-
-
   function updateChart() {
     const selectedAno = anoSelect.property("value");
     const selectedMes = mesSelect.property("value");
@@ -53,6 +51,7 @@ async function drawSunburst() {
 
     // Borrar gráfico anterior
     container.select("svg").remove();
+    container.select(".sunburst-legend").remove();
 
     // Recalcular jerarquía
     const hierarchy = d3.hierarchy(rootData)
@@ -60,8 +59,18 @@ async function drawSunburst() {
       .sort((a, b) => b.value - a.value);
 
     const cardW = container.node().closest('.card')?.clientWidth || container.node().clientWidth || 928;
-    const width = cardW;     // limita para que no desborde la card
-    const radius = width / 7;
+    const width = cardW;
+
+    // === Radio dinámico (Opción A)
+    const PAD = 8;
+    function computeRadius(visibleDepth) {
+      // visibleDepth = 2 (1 anillo) ó 3 (2 anillos)
+      return (width / 2 - PAD) / visibleDepth;
+    }
+    let maxVisible = 2;                   // inicio: solo L1 (y1<=2)
+    let radius = computeRadius(maxVisible);
+
+    // Colores
     const color = d3.scaleOrdinal(d3.quantize(d3.interpolateRainbow, rootData.children.length + 1));
 
     const root = d3.partition()
@@ -82,6 +91,48 @@ async function drawSunburst() {
       .style("font", "10px sans-serif");
 
     const g = svg.append("g");
+
+    // --- LEYENDA SUNBURST ---
+    const legendLabels = {
+      "Presencia en línea": "Presencia en línea (B)",
+      "Tiendas en línea": "Tiendas en línea (C)",
+      "Servicios en línea": "Servicios en línea (D)",
+      "Servicios TIC": "Servicios TIC (E)"
+    };
+
+    container.select(".sunburst-legend").remove();
+
+    const l1Names = (root.children || []).map(d => d.data.name);
+
+    const legend = container.append("div")
+      .attr("class", "legend sunburst-legend")
+      .style("margin-top", "10px");
+
+    const items = legend.selectAll(".legend-item")
+      .data(l1Names)
+      .join("div")
+      .attr("class", "legend-item")
+      .each(function(name){
+        d3.select(this).html(`
+          <span class="swatch" style="background:${color(name)}"></span>
+          <span>${legendLabels[name] || name}</span>
+        `);
+      });
+
+    items.on("click", (event, name) => {
+      const node = root.children.find(d => d.data.name === name);
+      if (node) clicked({altKey:false}, node);
+    });
+
+    items.on("mouseenter", (event, name) => {
+      const topName = name;
+      g.selectAll("path").attr("opacity", d => {
+        let p = d; while (p.depth > 1) p = p.parent;
+        return p.data.name === topName ? 1 : 0.25;
+      });
+    }).on("mouseleave", () => {
+      g.selectAll("path").attr("opacity", 1);
+    });
 
     const path = g.selectAll("path")
       .data(root.descendants().slice(1))
@@ -117,9 +168,15 @@ async function drawSunburst() {
       .attr("pointer-events", "all")
       .on("click", clicked);
 
+    // ===== Click con suavizado del radio (tween)
     function clicked(event, p) {
-      parent.datum(p.parent || root);
+      const nextFocus = p.parent || root;
+      parent.datum(nextFocus);
 
+      // Regla con p: raíz => 1 anillo; rama => 2 anillos
+      const nextMaxVisible = (p === root) ? 2 : 3;
+
+      // Targets para zoom angular/radial estándar
       root.each(d => d.target = {
         x0: Math.max(0, Math.min(1, (d.x0 - p.x0) / (p.x1 - p.x0))) * 2 * Math.PI,
         x1: Math.max(0, Math.min(1, (d.x1 - p.x0) / (p.x1 - p.x0))) * 2 * Math.PI,
@@ -129,31 +186,54 @@ async function drawSunburst() {
 
       const t = svg.transition().duration(event.altKey ? 7500 : 750);
 
+      // Tween SUAVE del radio (de r0 a r1)
+      const r0 = radius;
+      const r1 = computeRadius(nextMaxVisible);
+
+      t.tween("radius", () => {
+        const ri = d3.interpolateNumber(r0, r1);
+        return tt => {
+          radius = ri(tt);
+          arc.padRadius(radius * 1.5); // padding acompasa el radio
+        };
+      });
+
+      // Círculo central: interpolar su 'r'
+      parent.transition(t).attrTween("r", () => d3.interpolateNumber(r0, r1));
+
+      // Cambiamos el tope de visibilidad (para filtros de opacidad/eventos)
+      maxVisible = nextMaxVisible;
+
+      // Transición de arcos
       path.transition(t)
         .tween("data", d => {
           const i = d3.interpolate(d.current, d.target);
-          return t => d.current = i(t);
+          return tt => d.current = i(tt);
         })
         .filter(function(d) {
           return +this.getAttribute("fill-opacity") || arcVisible(d.target);
         })
         .attr("fill-opacity", d => arcVisible(d.target) ? (d.children ? 0.6 : 0.4) : 0)
         .attr("pointer-events", d => arcVisible(d.target) ? "auto" : "none")
-        .attrTween("d", d => () => arc(d.current));
+        .attrTween("d", d => () => arc(d.current)); // usa el radio que va cambiando
 
-      label.filter(function(d) {
-        return +this.getAttribute("fill-opacity") || labelVisible(d.target);
-      }).transition(t)
+      // Transición de etiquetas
+      label
+        .filter(function(d) {
+          return +this.getAttribute("fill-opacity") || labelVisible(d.target);
+        })
+        .transition(t)
         .attr("fill-opacity", d => +labelVisible(d.target))
         .attrTween("transform", d => () => labelTransform(d.current));
     }
 
     function arcVisible(d) {
-      return d.y1 <= 3 && d.y0 >= 1 && d.x1 > d.x0;
+      return d.y1 <= maxVisible && d.y0 >= 1 && d.x1 > d.x0;
     }
 
     function labelVisible(d) {
-      return d.y1 <= 3 && d.y0 >= 1 && (d.y1 - d.y0) * (d.x1 - d.x0) > 0.03;
+      return d.y1 <= maxVisible && d.y0 >= 1 &&
+         (d.y1 - d.y0) * (d.x1 - d.x0) > 0.03;
     }
 
     function labelTransform(d) {
