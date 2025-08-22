@@ -5,11 +5,11 @@
 
   // Categorías en orden visual B1..E
   const CATS = [
-    { key: "CAT B1", label: "B1", color: "#6a1b9a" }, // Presencia pasiva
-    { key: "CAT B2", label: "B2", color: "#2a9bd6" }, // Presencia activa
-    { key: "CAT C",  label: "C",  color: "#d81b60" }, // Tiendas en línea
-    { key: "CAT D",  label: "D",  color: "#be2da1" }, // Servicios en línea
-    { key: "CAT E",  label: "E",  color: "#244c9a" }, // Servicios TIC
+    { key: "CAT B1", label: "Presencia Pasiva (B1)", color: "#6a1b9a" }, // Presencia pasiva
+    { key: "CAT B2", label: "Presencia Activa (B2)", color: "#2a9bd6" }, // Presencia activa
+    { key: "CAT C",  label: "Tiendas en línea (C)",  color: "#d81b60" }, // Tiendas en línea
+    { key: "CAT D",  label: "Servicios en línea (D)",  color: "#be2da1" }, // Servicios en línea
+    { key: "CAT E",  label: "Servicios TIC",  color: "#244c9a" }, // Servicios TIC
   ];
 
   // --------- Layout base (sin selects locales) ----------
