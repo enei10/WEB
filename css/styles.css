@@ -315,3 +315,22 @@ h2 {
 
 /* Asegura posicionamiento del tooltip del Heartbeat dentro de su card */
 #stacked-chart { position: relative; }
+
+
+#semi-donut .semi-value {
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  fill: #222;
+}
+
+#semi-donut .semi-value .sv-line1 {
+  font-weight: 700;
+  font-size: 14px;
+}
+
+#semi-donut .semi-value .sv-line2 {
+  font-weight: 500;
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+
