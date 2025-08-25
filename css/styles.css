@@ -55,6 +55,23 @@ h2 {
   border-radius: 3px;
 }
 
+
+/* Tooltip estándar para todos los gráficos */
+.chart-tooltip{
+  position: absolute;
+  background: #fff;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  padding: 8px 12px;
+  box-shadow: 0 2px 6px rgba(0,0,0,.18);
+  font: 13px/1.25 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  pointer-events: none;
+  opacity: 0;                 /* se controla desde JS */
+  transition: opacity .15s ease;
+  z-index: 10;
+  white-space: nowrap;
+}
+
 /* === LINECHART === */
 #line-chart-container {
   width: 100%;
@@ -97,6 +114,12 @@ h2 {
   font-size: 12px;
 }
 
+.card-hd h2,
+.card-hd h3 {
+  text-align: center;
+  width: 100%;
+}
+
 #stacked-legend .legend-item {
   display: inline-flex;
   align-items: center;
@@ -131,6 +154,15 @@ h2 {
   max-width: 900px;
   margin: auto;
   display: block;
+}
+
+#sunburst-chart{
+  position: relative;
+}
+
+#sunburst-chart text {
+  font-size: 15px;
+  font-family: sans-serif;
 }
 
 /* === SEMIDONUT === */
@@ -198,6 +230,9 @@ h2 {
 #semi-donut, #semi-donut *{
   user-select: none;
 }
+
+
+.bar-treemap-wrap{ position: relative; }
 
 
 /* ###################### */
