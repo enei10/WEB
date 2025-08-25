@@ -213,7 +213,7 @@
                 <span style="width:10px;height:10px;background:${d.color};display:inline-block;border-radius:2px"></span>
                 <strong>${d.label}</strong>
               </div>
-              <div>Año: <strong>${yval}</strong> &nbsp; Mes: <strong>${mval}</strong></div>
+              
               <div>Footprint: <strong>${fmt(d.value)}</strong></div>
             `);
 
