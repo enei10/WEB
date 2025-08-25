@@ -1,11 +1,21 @@
+// js/charts/stackedChart.js
+// Requiere D3 v7+
+
 document.addEventListener("DOMContentLoaded", () => {
+  const host = d3.select("#stacked-chart");                 // contenedor del card (position:relative en tu CSS)
+  const selectorWrap = d3.select("#stacked-selector");      // donde va la leyenda y (ocultos) los selects
+
   const margin = { top: 40, right: 30, bottom: 60, left: 120 };
-  const width = (d3.select("#stacked-chart").node().clientWidth || 900) - margin.left - margin.right;
+  const baseHeight = 400;
+  const height = baseHeight - margin.top - margin.bottom;
 
-  const height = 400 - margin.top - margin.bottom;
+  // --- medidas dinámicas ---
+  const getWidth = () =>
+    (host.node()?.clientWidth || 900) - margin.left - margin.right;
+  let width = getWidth();
 
-  const svgRoot = d3.select("#stacked-chart")
-    .append("svg")
+  // --- SVG responsivo ---
+  const svgRoot = host.append("svg")
     .attr("viewBox", `0 0 ${width + margin.left + margin.right} ${height + margin.top + margin.bottom}`)
     .attr("preserveAspectRatio", "xMidYMid meet")
     .style("width", "100%")
@@ -24,26 +34,55 @@ document.addEventListener("DOMContentLoaded", () => {
   let active = new Set(niveles);
 
   // ===== Tooltip =====
-  const tooltip = d3.select("#stacked-chart")
-    .append("div")
-    .attr("class", "tooltip")
+  const tooltip = host.append("div")
+    .attr("class", "chart-tooltip")
     .style("position", "absolute")
     .style("pointer-events", "none")
-    .style("display", "none")
-    .style("padding", "6px 8px")
-    .style("background", "rgba(0,0,0,.75)")
-    .style("color", "#fff")
-    .style("border-radius", "4px")
-    .style("font", "12px/1.2 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif");
+    .style("opacity", 0);
+
+  // Helpers anticorte (flip + clamp)
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  const pad = 8, shift = 12;
+
+  function showTip(event, html){
+    if (html) tooltip.html(html);
+    tooltip.interrupt().style("opacity", 0.98);
+
+    const [mx, my] = d3.pointer(event, host.node());
+
+    const cw = host.node().clientWidth;
+    const ch = host.node().clientHeight;
+    const tw = tooltip.node().offsetWidth  || 0;
+    const th = tooltip.node().offsetHeight || 0;
+
+    let left = mx + shift;
+    let top  = my - 10;
+
+    // si no cabe a la derecha, pásalo a la izquierda
+    if (left + tw + pad > cw) left = mx - tw - shift;
+
+    // limitar a los bordes del host
+    left = clamp(left, pad, cw - tw - pad);
+    top  = clamp(top,  pad, ch - th - pad);
+
+    tooltip.style("left", `${left}px`).style("top", `${top}px`);
+  }
+  const hideTip = () => tooltip.transition().duration(120).style("opacity", 0);
+
+  // ===== Escalas y ejes (persistentes) =====
+  const x = d3.scaleLinear().range([0, width]);
+  const y = d3.scaleBand().range([0, height]).padding(0.2);
+
+  svg.append("g").attr("class", "x-axis").attr("transform", `translate(0,${height})`);
+  svg.append("g").attr("class", "y-axis");
 
   // ===== Datos =====
   d3.dsv(";", "data/heartbeat.csv", d => {
     d = d3.autoType(d);
-    d.Mes = String(d.Mes).trim();   // 🔴 crítico para que coincida con el filtro global
+    d.Mes = String(d.Mes).trim(); // importante para filtro global
     return d;
   }).then(data => {
-    const selectorWrap = d3.select("#stacked-selector");
-
+    // --- Meses / Años ordenados ---
     const ordenMeses = [
       "Enero","Febrero","Marzo","Abril","Mayo","Junio",
       "Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"
@@ -52,7 +91,7 @@ document.addEventListener("DOMContentLoaded", () => {
       .sort((a, b) => ordenMeses.indexOf(a) - ordenMeses.indexOf(b));
     const anios = Array.from(new Set(data.map(d => d.Año))).sort();
 
-    // ===== Filtros =====
+    // ===== Selectores (locales, ocultos por tu CSS) =====
     const selMes = selectorWrap.append("select")
       .attr("id", "selMes")
       .style("margin-right", "10px")
@@ -63,19 +102,6 @@ document.addEventListener("DOMContentLoaded", () => {
       .attr("id", "selAnio")
       .on("change", () => updateChart(true));
     selAnio.selectAll("option").data(anios).enter().append("option").text(d => d);
-
-    // === Sincronizar con filtro global ===
-    FilterBus?.subscribe(({year, month}) => {
-      if (year == null || !month) return;
-      selAnio.property("value", year);
-      selMes.property("value", month);
-      updateChart(true);
-    });
-
-    // Ocultar selectores locales
-    d3.select("#selMes").style("display","none");
-    d3.select("#selAnio").style("display","none");
-
 
     // ===== Leyenda (click -> toggle SIN tachado) =====
     d3.select("#stacked-legend").remove();
@@ -97,8 +123,7 @@ document.addEventListener("DOMContentLoaded", () => {
         .style("gap", "8px")
         .style("white-space", "nowrap")
         .style("cursor", "pointer")
-        .on("click", function (event, key) {
-          // alternar estado
+        .on("click", (event, key) => {
           if (active.has(key)) active.delete(key); else active.add(key);
           updateLegendStyles();
           updateChart(true);
@@ -115,37 +140,57 @@ document.addEventListener("DOMContentLoaded", () => {
     legendItems.append("span").text(d => d);
 
     function updateLegendStyles() {
-      legendItems
-        .style("opacity", d => active.has(d) ? 1 : 0.35); // sin tachado
+      legendItems.style("opacity", d => active.has(d) ? 1 : 0.35);
     }
 
-    // ===== Escalas y ejes =====
-    const x = d3.scaleLinear().range([0, width]);
-    const y = d3.scaleBand().range([0, height]).padding(0.2);
+    // === Sincronizar con filtro global ===
+    window.FilterBus?.subscribe(({year, month}) => {
+      if (year == null || !month) return;
+      selAnio.property("value", year);
+      selMes.property("value", month);
+      updateChart(true);
+    });
 
-    svg.append("g").attr("class", "x-axis").attr("transform", `translate(0,${height})`);
-    svg.append("g").attr("class", "y-axis");
-
-    // Inicialización filtros
+    // Inicialización (primer año/mes disponibles)
     const primerAnio = anios[0];
     const mesesDePrimerAnio = meses.filter(m => data.some(d => d.Año === primerAnio && d.Mes === m));
     const primerMes = mesesDePrimerAnio[0];
-    d3.select("#selAnio").property("value", primerAnio);
-    d3.select("#selMes").property("value", primerMes);
+    selAnio.property("value", primerAnio);
+    selMes.property("value", primerMes);
 
     updateLegendStyles();
-    updateChart();
+    updateChart(false);
 
-    function updateChart(withEase=false) {
-      const mes  = d3.select("#selMes").property("value");
-      const anio = +d3.select("#selAnio").property("value");
+    // ===== Re-layout sincronizado con el card =====
+    const ro = new ResizeObserver(() => {
+      width = getWidth();
+      svgRoot.attr("viewBox",
+        `0 0 ${width + margin.left + margin.right} ${height + margin.top + margin.bottom}`);
+      x.range([0, width]);
+      updateChart(false); // reusar escalas y repintar
+    });
+    ro.observe(host.node());
+
+    // Fallback
+    window.addEventListener("resize", () => {
+      width = getWidth();
+      svgRoot.attr("viewBox",
+        `0 0 ${width + margin.left + margin.right} ${height + margin.top + margin.bottom}`);
+      x.range([0, width]);
+      updateChart(false);
+    }, { passive: true });
+
+    // ===== Render =====
+    function updateChart(withEase = false) {
+      const mes  = selMes.property("value");
+      const anio = +selAnio.property("value");
       const datosFiltrados = data.filter(d => d.Mes === mes && d.Año === anio);
 
       // Agrupar por categoría
       const datosPorCategoria = d3.group(datosFiltrados, d => d.Categorías);
 
-      // 1) Calcular total SOLO de series activas (para re-normalizar)
-      // 2) Para series inactivas -> valor 0
+      // 1) Total SOLO de series activas (renormaliza a 100)
+      // 2) Series inactivas -> 0
       const datosTransformados = Array.from(datosPorCategoria, ([categoria, valores]) => {
         const obj = { Categoria: categoria };
         const totalActivo = d3.sum(valores, d => d3.sum(niveles, k => active.has(k) ? d[k] : 0));
@@ -154,18 +199,18 @@ document.addEventListener("DOMContentLoaded", () => {
           const sumaNivel = d3.sum(valores, d => d[nivel]);
           obj[nivel] = active.has(nivel)
             ? (totalActivo ? (sumaNivel * 100 / totalActivo) : 0)
-            : 0; // inactivos a 0
+            : 0;
         });
         return obj;
       });
 
-      // Stack SIEMPRE con el ORDEN COMPLETO de 'niveles' (posición/color fijos)
+      // Stack SIEMPRE con el orden completo (posición/color fijos)
       const series = d3.stack().keys(niveles)(datosTransformados);
 
       x.domain([0, 100]);
-      y.domain(datosTransformados.map(d => d.Categoria));
+      y.domain(datosTransformados.map(d => d.Categoria)).range([0, height]);
 
-      const t = svg.transition().duration(withEase ? 450 : 250);
+      const t = svg.transition().duration(withEase ? 450 : 250).ease(d3.easeCubic);
 
       svg.select(".x-axis").transition(t)
         .call(d3.axisBottom(x).ticks(5).tickFormat(d => `${d}%`));
@@ -184,7 +229,7 @@ document.addEventListener("DOMContentLoaded", () => {
         .attr("class", "layer");
 
       const mergedGrupos = nuevosGrupos.merge(grupos)
-        .attr("fill", d => color(d.key)); // color inmutable por clave
+        .attr("fill", d => color(d.key));
 
       // Rects
       const rects = mergedGrupos.selectAll("rect")
@@ -197,27 +242,51 @@ document.addEventListener("DOMContentLoaded", () => {
         .attr("height", y.bandwidth())
         .attr("width", 0)
         .on("mouseover", (event, d) => {
-          if (!active.has(d.key)) return; // si está apagada, sin tooltip
-          tooltip.style("display", "block")
-            .html(`<strong>${d.key}</strong><br>${d.data.Categoria}: ${d3.format(".1f")(d.data[d.key])}%`);
+          if (!active.has(d.key)) return;
+          const html = `
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+              <span style="width:10px;height:10px;background:${color(d.key)};display:inline-block;border-radius:2px"></span>
+              <strong>${d.key}</strong>
+            </div>
+            ${d.data.Categoria}: <strong>${d3.format(".1f")(d.data[d.key])}%</strong>
+          `;
+          showTip(event, html);
         })
-        .on("mousemove", (event) => {
-          const container = document.querySelector("#stacked-chart").getBoundingClientRect();
-          tooltip
-            .style("left", (event.clientX - container.left + 10) + "px")
-            .style("top", (event.clientY - container.top - 28) + "px");
+        .on("mousemove", (event, d) => {
+          if (!active.has(d.key)) return;
+          showTip(event); // solo reubica, conserva HTML
         })
-        .on("mouseleave", () => tooltip.style("display", "none"))
+        .on("mouseleave", hideTip)
         .transition(t)
         .attr("width", d => x(d[1]) - x(d[0]));
 
-      rects.transition(t)
+      rects
+        .on("mouseover", (event, d) => {
+          if (!active.has(d.key)) return;
+          const html = `
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+              <span style="width:10px;height:10px;background:${color(d.key)};display:inline-block;border-radius:2px"></span>
+              <strong>${d.key}</strong>
+            </div>
+            ${d.data.Categoria}: <strong>${d3.format(".1f")(d.data[d.key])}%</strong>
+          `;
+          showTip(event, html);
+        })
+        .on("mousemove", (event, d) => {
+          if (!active.has(d.key)) return;
+          showTip(event);
+        })
+        .on("mouseleave", hideTip)
+        .transition(t)
         .attr("x", d => x(d[0]))
         .attr("width", d => x(d[1]) - x(d[0]))
         .attr("y", d => y(d.data.Categoria))
         .attr("height", y.bandwidth());
 
       rects.exit().remove();
+
+      svg.select(".x-axis").raise();
+      svg.select(".y-axis").raise();
     }
   });
 });
