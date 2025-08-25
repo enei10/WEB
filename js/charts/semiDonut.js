@@ -1,13 +1,33 @@
 // js/charts/semiDonut.js — Semicírculo 180° con nombres de meses visibles y texto interior (dos líneas)
 // - Solo meses disponibles (sin rellenar faltantes)
 // - Rotación instantánea (drag/rueda), sin tween de desplazamiento
-// - Tooltip estable
+// - Tooltip estable (flip + clamp)
 // - Etiquetas (solo mes) rotadas tangencialmente, con tamaño auto y centradas radialmente
-// - Texto DENTRO del semicírculo (en el hueco), pegado al borde derecho del radio interno
+// - Texto DENTRO del semicírculo (en el hueco), mismas posiciones que tu versión (vx = innerR/2)
 
 document.addEventListener("DOMContentLoaded", async () => {
   const host = d3.select("#semi-donut");
   if (host.empty()) return;
+  host.style("position","relative"); // ancla del tooltip por si el CSS aún no carga
+
+  // === Utilidades de estabilidad / clamp ===
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  async function waitForStableSize(el, { minStabilityMs=220, timeoutMs=3000 } = {}){
+    return new Promise(resolve => {
+      let last = el.clientWidth, lastChange = performance.now(), start = performance.now();
+      const ro = new ResizeObserver(() => {
+        const w = el.clientWidth;
+        if (w !== last){ last = w; lastChange = performance.now(); }
+      });
+      ro.observe(el);
+      (function check(){
+        const now = performance.now();
+        if ((now - lastChange >= minStabilityMs && last > 0) || (now - start >= timeoutMs)){
+          ro.disconnect(); resolve();
+        } else { requestAnimationFrame(check); }
+      })();
+    });
+  }
 
   const MESES = [
     "Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio",
@@ -67,39 +87,35 @@ document.addEventListener("DOMContentLoaded", async () => {
     const innerR = outerR * 0.60;
 
     // === Texto dinámico (dos líneas) DENTRO del semicírculo ===
-    // Lo anclamos al borde derecho del radio interno (pegado hacia dentro)
-    const vx = innerR /2;     // “pegado” a la derecha del hueco
-    const vy = height / 2;      // centro vertical
+    // (mantenemos tu posición original con vx = innerR/2)
+    const vx = innerR / 2;
+    const vy = height / 2;
     const valueG = svg.append("text")
       .attr("class", "semi-value")
       .attr("x", vx)
       .attr("y", vy)
-      .attr("text-anchor", "middle")        // alinea el texto al borde interior derecho
+      .attr("text-anchor", "middle")
       .attr("alignment-baseline", "middle");
 
-    // Línea 1: "Mes Año"
     valueG.append("tspan")
       .attr("class", "sv-line1")
       .attr("x", vx)
       .attr("dy", "-0.25em");
 
-    // Línea 2: "N,NNN páginas"
     valueG.append("tspan")
       .attr("class", "sv-line2")
       .attr("x", vx)
       .attr("dy", "1.2em");
 
-    // Cabeza de flecha (apunta hacia abajo), centrada bajo el bloque de texto
+    // Flecha
     const arrow = svg.append("path")
       .attr("class", "semi-arrow")
-      // triángulo con vértice abajo en (0,0) y base en y=-8
       .attr("d", "M0,0 L6,-8 L0,-8")
       .attr("opacity", 0.85);
 
-    // === Flecha en modo POLAR ===
     const ARROW_POLAR = {
-      rFactor: 0.95, // 0.0=centro, 1.0=radio interno, >1 hacia el arco
-      angleDeg: 90,  // 0=derecha, 90=abajo, 180=izquierda, 270=arriba
+      rFactor: 0.95,
+      angleDeg: 90,
       size: 1.0
     };
 
@@ -108,17 +124,12 @@ document.addEventListener("DOMContentLoaded", async () => {
       const theta = ARROW_POLAR.angleDeg * Math.PI / 180;
       const ax = cx + r * Math.cos(theta);
       const ay = cy + r * Math.sin(theta);
-
-      // El path por defecto apunta hacia abajo; rotamos (ángulo - 90) para alinear la punta
       arrow
         .attr("transform",
           `translate(${ax},${ay}) rotate(${ARROW_POLAR.angleDeg - 90}) scale(${ARROW_POLAR.size})`
         )
-        .raise(); // asegura que quede encima de los segmentos
+        .raise();
     }
-
-
-
 
     // Pie 180°
     const pie = d3.pie()
@@ -155,11 +166,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
     const keyOf = d => `${d.anio}-${d.mes}`;
 
-
     // Estado
     let currentSeries = series.slice();
     let currentArcs   = pie(currentSeries);
-
 
     function draw(arcs){
       const slices = g.selectAll("g.slice").data(arcs, d => keyOf(d.data));
@@ -181,8 +190,16 @@ document.addEventListener("DOMContentLoaded", async () => {
           );
         })
         .on("mousemove", evt => {
-          const [x,y] = d3.pointer(evt, host.node());
-          tooltip.style("left", `${x+12}px`).style("top", `${y-10}px`);
+          const [mx,my] = d3.pointer(evt, host.node());
+          const tw = tooltip.node().offsetWidth || 0;
+          const th = tooltip.node().offsetHeight || 0;
+          const cw = host.node().clientWidth;
+          const ch = host.node().clientHeight;
+          let left = mx + 12, top = my - 10;
+          if (left + tw + 8 > cw) left = mx - tw - 12;   // flip si no cabe a la derecha
+          left = clamp(left, 8, cw - tw - 8);
+          top  = clamp(top,  8, ch - th - 8);
+          tooltip.style("left", `${left}px`).style("top", `${top}px`);
         })
         .on("mouseleave", () => {
           tooltip.interrupt().transition().duration(120).style("opacity",0);
@@ -235,7 +252,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       // EXIT
       slices.exit().remove();
 
-      // === Actualiza el texto interior (dos líneas) con el segmento "activo" (arcs[0]) ===
+      // Texto interior (dos líneas) con el “activo” (arcs[0])
       if (arcs.length > 0) {
         const f = arcs[0].data;
         const fmt = d3.format(",");
@@ -245,7 +262,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     placeArrow();
-
 
     function update(nextSeries){
       const nextArcs = pie(nextSeries.slice());
@@ -304,6 +320,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     draw(currentArcs);
   }
 
+  // === Primer render ESTABLE ===
+  try { await document.fonts?.ready; } catch(_) {}
+  await waitForStableSize(host.node());
   render();
-  window.addEventListener("resize", render);
+
+  // === Re-render por cambios de tamaño (contendor + ventana) ===
+  const ro = new ResizeObserver(() => render());
+  ro.observe(host.node());
+  window.addEventListener("resize", () => render(), { passive: true });
 });
