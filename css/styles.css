@@ -150,9 +150,11 @@ h2 {
 }
 
 /* ################################ */
-#sunburst-chart svg {
-  max-width: 900px;
-  margin: auto;
+/* Antes: max-width: 900px;  -> limita el ancho */
+#sunburst-chart svg{
+  max-width: 100%;
+  width: 100%;
+  height: auto;
   display: block;
 }
 
@@ -368,4 +370,27 @@ h2 {
   opacity: 0.9;
 }
 
+
+/* Fila en dos columnas: izquierda Semidonut, derecha Sunburst (más ancho a la derecha) */
+.row.two-cols{
+  display: grid;
+  grid-template-columns: 1fr 1.6fr;      /* ahora la derecha es más ancha */
+  gap: 1rem;
+  align-items: stretch;
+  grid-template-areas: "semidonut sunburst";
+}
+
+.sunburst-card  { grid-area: sunburst; }
+.semidonut-card { grid-area: semidonut; }
+
+
+/* En móvil: primero Semidonut, luego Sunburst (coherente con el orden de escritorio) */
+@media (max-width: 900px){
+  .row.two-cols{
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "semidonut"
+      "sunburst";
+  }
+}
 
