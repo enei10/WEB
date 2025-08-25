@@ -68,7 +68,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     const fullW = (host.node().clientWidth || 900);
     const width  = Math.max(320, fullW - margin.left - margin.right);
-    const height = Math.max(420, Math.round(fullW * 0.5));
+    const height = Math.max(700, Math.round(fullW * 1.1));
 
     const svgRoot = host.append("svg")
       .attr("viewBox", `0 0 ${width + margin.left + margin.right} ${height + margin.top + margin.bottom}`)
