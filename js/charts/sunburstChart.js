@@ -1,6 +1,24 @@
 async function drawSunburst() {
   const rawData = await d3.dsv(";", "data/sunburst.csv", d3.autoType);
-  const container = d3.select("#sunburst-chart");
+  const container = d3.select("#sunburst-chart").style("position","relative"); // ← ancla tooltip
+
+  // === Helper: esperar a que el contenedor esté estable (evita “saltos” en primer render)
+  async function waitForStableSize(el, { minStabilityMs=220, timeoutMs=3000 } = {}) {
+    return new Promise(resolve => {
+      let last = el.clientWidth, lastChange = performance.now(), start = performance.now();
+      const ro = new ResizeObserver(() => {
+        const w = el.clientWidth;
+        if (w !== last) { last = w; lastChange = performance.now(); }
+      });
+      ro.observe(el);
+      (function check(){
+        const now = performance.now();
+        if ((now - lastChange >= minStabilityMs && last > 0) || (now - start >= timeoutMs)) {
+          ro.disconnect(); resolve();
+        } else { requestAnimationFrame(check); }
+      })();
+    });
+  }
 
   // Crear filtros únicos
   const anos  = Array.from(new Set(rawData.map(d => d.Ano)));
@@ -29,17 +47,56 @@ async function drawSunburst() {
   anoSelect.on("change", updateChart);
   mesSelect.on("change", updateChart);
 
-  // Dibujar por primera vez
+  const tip = container.selectAll(".sb-tooltip")
+    .data([null])
+    .join("div")
+    .attr("class", "tooltip sb-tooltip chart-tooltip") // ← tooltip estándar
+    .style("position", "absolute")
+    .style("pointer-events", "none")
+    .style("opacity", 0);
+
+  // === Helpers SOLO para tooltip (clamp y posicionamiento) ===
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  function showTip(event, html){
+    tip.interrupt().style("opacity", 0.98).html(html);
+
+    const [mx, my] = d3.pointer(event, container.node());
+    const pad = 8, shift = 14;
+
+    const cw = container.node().clientWidth;
+    const ch = container.node().clientHeight;
+    const tw = tip.node().offsetWidth  || 0;
+    const th = tip.node().offsetHeight || 0;
+
+    let left = mx + shift;
+    let top  = my + shift;
+
+    if (left + tw + pad > cw) left = mx - tw - shift;
+    left = clamp(left, pad, cw - tw - pad);
+    top  = clamp(top,  pad, ch - th - pad);
+
+    tip.style("left", `${left}px`).style("top", `${top}px`);
+  }
+  function hideTip(){ tip.transition().duration(120).style("opacity", 0); }
+
+  // === Primer render (esperando tamaño estable del card) ===
+  try { await document.fonts?.ready; } catch(_) {}
+  await waitForStableSize(container.node());
   updateChart();
 
   // Sincronizar con filtro global y ocultar selects locales
-  FilterBus.subscribe(({year, month}) => {
+  window.FilterBus?.subscribe(({year, month}) => {
     if (year == null || !month) return;
     anoSelect.property("value", year);
     mesSelect.property("value", month);
     updateChart();
   });
   controlDiv.style("display", "none");
+
+  // Re-trazo si cambia el tamaño del card o de la ventana
+  const ro = new ResizeObserver(() => updateChart());
+  ro.observe(container.node());
+  window.addEventListener("resize", () => updateChart(), { passive: true });
 
   function updateChart() {
     const selectedAno = anoSelect.property("value");
@@ -92,43 +149,55 @@ async function drawSunburst() {
 
     const g = svg.append("g");
 
-    // --- LEYENDA SUNBURST ---
-    const legendLabels = {
-      "Presencia en línea": "Presencia en línea (B)",
-      "Tiendas en línea": "Tiendas en línea (C)",
-      "Servicios en línea": "Servicios en línea (D)",
-      "Servicios TIC": "Servicios TIC (E)"
-    };
+    // --- LEYENDA SUNBURST (etiquetas completas B–E) ---
+    const LEGEND_DEF = [
+      { code: "B", name: "Presencia en línea" },
+      { code: "C", name: "Tiendas en línea" },
+      { code: "D", name: "Servicios en línea" },
+      { code: "E", name: "Servicios TIC" }
+    ];
 
-    container.select(".sunburst-legend").remove();
-
+    // nombres reales en L1 (como vienen en los datos)
     const l1Names = (root.children || []).map(d => d.data.name);
 
-    const legend = container.append("div")
+    // Resolver clave compatible con el color de los arcos (puede ser "B" o "Presencia en línea")
+    function resolveKey(entry) {
+      if (l1Names.includes(entry.code)) return entry.code;
+      if (l1Names.includes(entry.name)) return entry.name;
+      return entry.code; // fallback
+    }
+
+    // ⬅️ Inserta la leyenda como PRIMER hijo del contenedor (queda arriba del SVG)
+    const legend = container.insert("div", ":first-child")
       .attr("class", "legend sunburst-legend")
-      .style("margin-top", "10px");
+      .style("margin", "0 0 6px 0");
 
     const items = legend.selectAll(".legend-item")
-      .data(l1Names)
+      .data(LEGEND_DEF.map(d => ({
+        key: resolveKey(d),
+        label: `${d.name} (${d.code})`
+      })))
       .join("div")
-      .attr("class", "legend-item")
-      .each(function(name){
-        d3.select(this).html(`
-          <span class="swatch" style="background:${color(name)}"></span>
-          <span>${legendLabels[name] || name}</span>
-        `);
-      });
+      .attr("class", "legend-item");
 
-    items.on("click", (event, name) => {
-      const node = root.children.find(d => d.data.name === name);
-      if (node) clicked({altKey:false}, node);
+    items.each(function(d){
+      d3.select(this).html(`
+        <span class="swatch" style="background:${color(d.key)}"></span>
+        <span>${d.label}</span>
+      `);
     });
 
-    items.on("mouseenter", (event, name) => {
-      const topName = name;
-      g.selectAll("path").attr("opacity", d => {
-        let p = d; while (p.depth > 1) p = p.parent;
-        return p.data.name === topName ? 1 : 0.25;
+    // Clic en leyenda => zoom a esa L1
+    items.on("click", (event, d) => {
+      const node = (root.children || []).find(n => n.data.name === d.key);
+      if (node) clicked({ altKey:false }, node);
+    });
+
+    // Hover para resaltar
+    items.on("mouseenter", (event, d) => {
+      g.selectAll("path").attr("opacity", n => {
+        let p = n; while (p.depth > 1) p = p.parent;
+        return p.data.name === d.key ? 1 : 0.25;
       });
     }).on("mouseleave", () => {
       g.selectAll("path").attr("opacity", 1);
@@ -146,8 +215,38 @@ async function drawSunburst() {
       .style("cursor", "pointer")
       .on("click", clicked);
 
-    path.append("title")
-      .text(d => `${d.ancestors().map(d => d.data.name).reverse().join("/")}\n${d3.format(",d")(d.value)}`);
+    const fmtInt = d3.format(",d");
+    const fmtPct = d3.format(".1%");
+
+    // === Tooltip usando clamp ===
+    path
+      .on("mouseenter", () => tip.style("opacity", 0.98))
+      .on("mousemove", (event, d) => {
+        const names = d.ancestors().map(a => a.data.name).reverse().slice(1); // sin 'root'
+        const breadcrumb = names.join(" › ");
+
+        const total = root.value || d.value || 1;
+        const parentVal = (d.parent && d.parent.value) ? d.parent.value : d.value;
+        const pctRoot = (d.value && total) ? d.value / total : 0;
+        const pctParent = (d.value && parentVal) ? d.value / parentVal : 0;
+
+        // Color consistente con el arco: toma el color del nodo de nivel 1 (L1)
+        const l1 = d.ancestors().find(a => a.depth === 1) || d;
+        const swatchColor = color(l1.data.name);
+
+        const html = `
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+            <span style="width:10px;height:10px;background:${swatchColor};
+                        display:inline-block;border-radius:2px"></span>
+            <strong>${breadcrumb}</strong>
+          </div>
+          <div>Valor: <strong>${fmtInt(d.value || 0)}</strong></div>
+          <div>% de la categoría: <strong>${fmtPct(pctParent)}</strong></div>
+          <div>% del total: <strong>${fmtPct(pctRoot)}</strong></div>
+        `;
+        showTip(event, html);
+      })
+      .on("mouseleave", hideTip);
 
     const label = g.append("g")
       .attr("pointer-events", "none")
