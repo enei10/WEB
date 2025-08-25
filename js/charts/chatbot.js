@@ -1,11 +1,15 @@
 // js/charts/chatbot.js
+// Requiere D3 v7+
+
 document.addEventListener("DOMContentLoaded", async () => {
   const container = d3.select("#chatbot-chart");
+  container.style("position", "relative"); // ancla para el tooltip
 
   const margin = { top: 48, right: 28, bottom: 48, left: 56 };
-  const width = (d3.select("#chatbot-chart").node().clientWidth || 920) - margin.left - margin.right;
+  const getWidth = () =>
+    (container.node().clientWidth || 920) - margin.left - margin.right;
 
-
+  let width  = getWidth();
   const height = 420 - margin.top - margin.bottom;
 
   const svg = container.append("svg")
@@ -16,15 +20,33 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
 
-  // Tooltip
+  // Tooltip estándar
   const tooltip = container.append("div")
-    .attr("class", "tooltip")
+    .attr("class", "chart-tooltip")
     .style("position", "absolute")
     .style("pointer-events", "none")
     .style("opacity", 0);
 
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  function showTooltip(event, html) {
+    const [mx, my] = d3.pointer(event, container.node());
+    tooltip.html(html).style("opacity", 0.98);
+    const tw = tooltip.node().offsetWidth || 0;
+    const th = tooltip.node().offsetHeight || 0;
+    const cw = container.node().clientWidth;
+    const ch = container.node().clientHeight;
+    let left = mx + 14;
+    let top  = my - 10;
+    if (left + tw + 8 > cw) left = mx - tw - 14;
+    left = clamp(left, 8, cw - tw - 8);
+    top  = clamp(top,  8, ch - th - 8);
+    tooltip.style("left", `${left}px`).style("top", `${top}px`);
+  }
+  const hideTooltip = () => tooltip.transition().duration(120).style("opacity", 0);
+
   // Meses ES y parseo "Dic-2023"
   const mesesES = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+  const mesesESFull = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
   const parseMesYYYY = (str) => {
     if (!str) return null;
     const [mesStr, yyyyStr] = String(str).split("-");
@@ -33,9 +55,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (m < 0 || isNaN(y)) return null;
     return new Date(Date.UTC(y, m, 1));
   };
-  const formatMes = (d) => `${mesesES[d.getUTCMonth()]}-${d.getUTCFullYear()}`;
+  const formatMesHeader = (date) => `${mesesESFull[date.getUTCMonth()]} ${date.getUTCFullYear()}`;
 
-  // CSV con ';'
+  // ====== Datos ======
   let dataRaw = await d3.dsv(";", "data/chatbot.csv", d3.autoType);
 
   // Normalizar encabezado Mes (BOM)
@@ -51,7 +73,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   const allCols = Object.keys(dataRaw[0]);
   const seriesKeys = allCols.filter(k => !["Mes","fecha","Total", mesKey].includes(k));
 
-  // Escalas
+  // Estado de visibilidad de series (leyenda/tooltip)
+  const active = new Map(seriesKeys.map(k => [k, true]));
+
+  // Escalas (x se actualizará en relayout)
   const x = d3.scaleBand().domain(dataRaw.map(d => d.fecha)).range([0, width]).padding(0.2);
   const yMax = d3.max(dataRaw, d => {
     const sMax = d3.max(seriesKeys, k => +d[k] || 0) || 0;
@@ -59,23 +84,31 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
   const y = d3.scaleLinear().domain([0, yMax]).nice().range([height, 0]);
 
-  // Colores vivos para líneas
+  // Colores de líneas
   const color = d3.scaleOrdinal().domain(seriesKeys).range(d3.schemeSet1.slice(0, seriesKeys.length));
 
-  // Ejes (solo Y izquierda y X abajo)
-  g.append("g")
+  // Ejes
+  const xAxisG = g.append("g")
     .attr("class", "axis-x-bottom")
-    .attr("transform", `translate(0,${height})`)
-    .call(d3.axisBottom(x).tickFormat(formatMes));
+    .attr("transform", `translate(0,${height})`);
 
-  g.append("g")
+  const yAxisG = g.append("g")
     .attr("class", "axis-y-left")
     .call(d3.axisLeft(y).ticks(6));
 
-  // Barras (Total) + etiquetas arriba
+  function drawXAxis(){
+    xAxisG.call(d3.axisBottom(x).tickFormat(d => {
+      const m = d.getUTCMonth();
+      const y4 = d.getUTCFullYear();
+      return `${mesesES[m]}-${y4}`;
+    }));
+  }
+  drawXAxis();
+
+  // Barras (Total)
   const barFill = "#e4c3dfff";
-  const bars = g.append("g")
-    .attr("class", "bars")
+  const barsG = g.append("g").attr("class", "bars");
+  const bars = barsG
     .selectAll("rect")
     .data(dataRaw, d => d.Mes)
     .join("rect")
@@ -92,33 +125,18 @@ document.addEventListener("DOMContentLoaded", async () => {
     .ease(d3.easeCubicOut);
 
   const valueFmt = d3.format(",.0f");
-  const labels = g.append("g").attr("class", "bar-labels")
-    .selectAll("text")
-    .data(dataRaw, d => d.Mes)
-    .join("text")
-    .attr("x", d => x(d.fecha) + x.bandwidth() / 2)
-    .attr("y", y(0) - 6)
-    .attr("text-anchor", "middle")
-    .attr("fill", "#222")
-    .attr("font-size", 11)
-    .attr("opacity", 0)
-    .text(d => valueFmt(d.Total));
-
-  labels.transition()
-    .delay(150)
-    .duration(900)
-    .attr("y", d => y(d.Total) - 6)
-    .attr("opacity", 1)
-    .ease(d3.easeCubicOut);
 
   bars
     .on("mousemove", (event, d) => {
-      tooltip.style("opacity", 1)
-        .html(`<strong>${d.Mes}</strong><br/>Total: ${d.Total}`)
-        .style("left", (event.pageX + 14) + "px")
-        .style("top", (event.pageY - 24) + "px");
+      const html = `
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+          <span style="width:10px;height:10px;background:#666;display:inline-block;border-radius:2px"></span>
+          <strong>${d.Mes}</strong>
+        </div>
+        Total: <strong>${valueFmt(d.Total)}</strong>`;
+      showTooltip(event, html);
     })
-    .on("mouseleave", () => tooltip.style("opacity", 0));
+    .on("mouseleave", hideTooltip);
 
   // Datos de líneas
   const seriesData = seriesKeys.map(k => ({
@@ -134,7 +152,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   const linesG = g.append("g").attr("class", "lines");
 
-  // Paths de líneas (colores vivos + trazo más grueso)
+  // Paths de líneas
   const paths = linesG.selectAll(".line-series")
     .data(seriesData, d => d.key)
     .join("path")
@@ -144,21 +162,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     .attr("stroke", d => color(d.key))
     .attr("d", d => lineGen(d.values));
 
-  // Animación de dibujo
-  paths.each(function() {
-    const totalLength = this.getTotalLength();
-    d3.select(this)
-      .attr("stroke-dasharray", `${totalLength} ${totalLength}`)
-      .attr("stroke-dashoffset", totalLength)
-      .transition().duration(900).ease(d3.easeCubicOut)
-      .attr("stroke-dashoffset", 0);
-  });
-
-  // Puntos (mismo color que su línea)
-  linesG.selectAll(".points-series")
+  // Puntos (ocultos hasta terminar animación)
+  const pointsSeries = linesG.selectAll(".points-series")
     .data(seriesData, d => d.key)
     .join(enter => {
-      const gS = enter.append("g").attr("class", "points-series");
+      const gS = enter.append("g")
+        .attr("class", "points-series")
+        .style("opacity", 0);
+
       gS.selectAll("circle")
         .data(d => d.values.map(v => ({...v, key: d.key})))
         .join("circle")
@@ -167,110 +178,184 @@ document.addEventListener("DOMContentLoaded", async () => {
         .attr("r", 3.5)
         .attr("fill", d => color(d.key))
         .attr("stroke", d => color(d.key))
-        .attr("stroke-width", 1.25)
-        .on("mousemove", (event, d) => {
-          tooltip.style("opacity", 1)
-            .html(`<strong>${d.Mes}</strong><br/>${d.key}: ${d.value}`)
-            .style("left", (event.pageX + 14) + "px")
-            .style("top", (event.pageY - 24) + "px");
-        })
-        .on("mouseleave", () => tooltip.style("opacity", 0));
+        .attr("stroke-width", 1.25);
+
       return gS;
     });
 
-  // ===== Etiquetas SOLO para Jun-2025 en las LÍNEAS (a la derecha de cada punto) =====
-  const targetDate = parseMesYYYY("Jun-2025");
-  const labelOffset = 6;
-  const lineValueFmt = d3.format(",.0f");
-
-  const junLabelsG = linesG.append("g")
-    .attr("class", "line-point-labels-jun2025");
-
-  // Construir datos de etiquetas (una por serie, en Jun-2025)
-  const junLabelsData = seriesData.flatMap(s =>
-    s.values
-      .filter(v => v.fecha && targetDate && v.fecha.getTime() === targetDate.getTime())
-      .map(v => ({ ...v, key: s.key }))
-  );
-
-  junLabelsG.selectAll("text")
-    .data(junLabelsData)
-    .join("text")
-    .attr("x", d => x(d.fecha) + x.bandwidth() / 2 + labelOffset)
-    .attr("y", d => y(d.value))
-    .attr("dominant-baseline", "middle")
-    .attr("text-anchor", "start")
-    .attr("fill", "black")
-    .attr("font-weight", 500)
-    .attr("stroke-width", 1)
-    .attr("paint-order", "stroke")
-    .attr("font-size", 9) 
-    .text(d => lineValueFmt(d.value));
-
-  // Leyenda clickeable alineada a la izquierda
-  const legend = svg.append("g")
-    .attr("transform", `translate(${margin.left}, ${12})`)
-    .attr("font-size", 12)
-    .attr("text-anchor", "start");
-
-  let xOffset = 0;
-  const legendItem = legend.selectAll(".legend-item")
-    .data(seriesKeys)
-    .join("g")
-    .attr("class", "legend-item")
-    .attr("transform", d => {
-      const pos = `translate(${xOffset}, 0)`;
-      xOffset += (d.length * 7) + 28; // ancho dinámico según texto + rect
-      return pos;
-    })
-    .style("cursor", "pointer");
-
-  legendItem.append("rect")
-    .attr("x", 0).attr("y", -10)
-    .attr("width", 14).attr("height", 14).attr("rx", 3)
-    .attr("fill", d => color(d));
-
-  legendItem.append("text")
-    .attr("x", 20)
-    .attr("y", 2)
-    .text(d => d);
-
-  const active = new Map(seriesKeys.map(k => [k, true]));
-
-  legendItem.on("click", (event, key) => {
-    const newState = !active.get(key);
-    active.set(key, newState);
-
-    d3.select(event.currentTarget).select("rect")
-      .attr("fill", newState ? color(key) : "#ddd");
-
-    linesG.selectAll(".line-series")
-      .filter(d => d.key === key)
-      .attr("opacity", newState ? 1 : 0);
-
-    linesG.selectAll(".points-series")
-      .filter(d => d.key === key)
-      .attr("opacity", newState ? 1 : 0);
-
-    // Sincronizar etiquetas de Jun-2025 con la visibilidad de cada serie
-    junLabelsG.selectAll("text")
-      .filter(d => d.key === key)
-      .attr("opacity", newState ? 1 : 0);
+  // Animación de líneas + mostrar puntos
+  let pending = 0;
+  paths.each(function() { pending += 1; });
+  paths.each(function() {
+    const totalLength = this.getTotalLength();
+    d3.select(this)
+      .attr("stroke-dasharray", `${totalLength} ${totalLength}`)
+      .attr("stroke-dashoffset", totalLength)
+      .transition().duration(900).ease(d3.easeCubicOut)
+      .attr("stroke-dashoffset", 0)
+      .on("end", () => {
+        pending -= 1;
+        if (pending === 0) {
+          pointsSeries
+            .transition().duration(300)
+            .style("opacity", d => active.get(d.key) ? 1 : 0);
+        }
+      });
   });
 
-  // Labels ejes
-  svg.append("text")
-    .attr("x", margin.left + width / 2)
-    .attr("y", margin.top + height + 36)
-    .attr("text-anchor", "middle")
-    .attr("fill", "#555")
-    .text("Mes");
+  // Leyenda (toggle)
+  const legendDiv = container.insert("div", ":first-child")
+    .attr("id","chatbot-legend")
+    .style("display","flex")
+    .style("flex-wrap","wrap")
+    .style("gap","10px 18px")
+    .style("justify-content","center")
+    .style("align-items","center")
+    .style("margin","8px 0");
 
-  svg.append("text")
-    .attr("x", -(margin.top + height / 2))
-    .attr("y", 16)
-    .attr("transform", "rotate(-90)")
-    .attr("text-anchor", "middle")
-    .attr("fill", "#555")
-    .text("Frecuencia");
+  const legendItems = legendDiv.selectAll(".legend-item")
+    .data(seriesKeys, d => d)
+    .join(enter => {
+      const it = enter.append("div")
+        .attr("class","legend-item")
+        .style("display","inline-flex")
+        .style("align-items","center")
+        .style("gap","8px")
+        .style("cursor","pointer")
+        .on("click", (ev, key) => {
+          const newState = !active.get(key);
+          active.set(key, newState);
+
+          d3.select(ev.currentTarget).style("opacity", newState ? 1 : 0.35);
+
+          // líneas / puntos
+          linesG.selectAll(".line-series")
+            .filter(d => d.key === key)
+            .attr("opacity", newState ? 1 : 0);
+
+          linesG.selectAll(".points-series")
+            .filter(d => d.key === key)
+            .transition().duration(200)
+            .style("opacity", newState ? 1 : 0);
+        });
+
+      it.append("span")
+        .style("width","12px").style("height","12px")
+        .style("border-radius","2px")
+        .style("box-shadow","0 0 0 1px rgba(0,0,0,.1) inset")
+        .style("background-color", d => color(d));
+
+      it.append("span").text(d => d);
+      return it;
+    });
+
+  legendItems.style("opacity", d => active.get(d) ? 1 : 0.35);
+
+  // Focus-line + overlay
+  const focus = g.append("g").attr("class", "focus").style("display", "none");
+  focus.append("line")
+    .attr("class", "focus-line")
+    .attr("stroke", "#888")
+    .attr("stroke-width", 1)
+    .attr("y1", 0)
+    .attr("y2", height);
+
+  const overlay = g.append("rect")
+    .attr("width", width)
+    .attr("height", height)
+    .style("fill", "none")
+    .style("pointer-events", "all")
+    .on("mouseover", () => { focus.style("display", null); })
+    .on("mouseout",  () => { focus.style("display", "none"); hideTooltip(); })
+    .on("mousemove", overlayMove);
+
+  function overlayMove(event) {
+    const [mx] = d3.pointer(event, g.node());
+    const centers = dataRaw.map(d => x(d.fecha) + x.bandwidth() / 2);
+    const idx = d3.leastIndex(centers, c => Math.abs(c - mx));
+    const row = dataRaw[idx];
+    const xCenter = centers[idx];
+
+    focus.select(".focus-line")
+      .attr("x1", xCenter)
+      .attr("x2", xCenter);
+
+    const header = `
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+        <strong>${formatMesHeader(row.fecha)}</strong>
+      </div>`;
+
+    const totalRow = `
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px;">
+        <span style="width:10px;height:10px;background:${barFill};display:inline-block;border-radius:2px"></span>
+        <span>Total: <strong>${valueFmt(row.Total)}</strong></span>
+      </div>`;
+
+    const rowsData = seriesKeys
+      .filter(k => active.get(k))
+      .map(k => ({ key: k, value: +row[k] || 0 }))
+      .sort((a,b) => b.value - a.value);
+
+    const rows = rowsData.map(({ key, value }) => `
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="width:10px;height:10px;background:${color(key)};display:inline-block;border-radius:2px"></span>
+        <span>${key}: <strong>${valueFmt(value)}</strong></span>
+      </div>
+    `).join("");
+
+    showTooltip(event, header + totalRow + rows);
+  }
+
+  // ===== Re-layout sincronizado =====
+  function relayout() {
+    width = getWidth();
+    svg.attr("viewBox", `0 0 ${width + margin.left + margin.right} ${height + margin.top + margin.bottom}`);
+    x.range([0, width]);
+    overlay.attr("width", width);
+
+    // Reposicionar todo (sin cambiar dominios)
+    drawXAxis();
+
+    bars
+      .attr("x", d => x(d.fecha))
+      .attr("width", x.bandwidth())
+      .attr("y", d => y(d.Total))
+      .attr("height", d => y(0) - y(d.Total));
+
+    linesG.selectAll(".line-series")
+      .attr("d", d => lineGen(d.values));
+
+    linesG.selectAll(".points-series circle")
+      .attr("cx", d => x(d.fecha) + x.bandwidth() / 2)
+      .attr("cy", d => y(d.value));
+  }
+
+  // Espera a que el layout esté estable antes del primer trazado animado (fonts/flujo)
+  async function waitForStableSize(el, { minStabilityMs=220, timeoutMs=3000 } = {}) {
+    return new Promise(resolve => {
+      let last = el.clientWidth, lastChange = performance.now(), start = performance.now();
+      const ro = new ResizeObserver(() => {
+        const w = el.clientWidth;
+        if (w !== last){ last = w; lastChange = performance.now(); }
+      });
+      ro.observe(el);
+      (function check(){
+        const now = performance.now();
+        if ((now - lastChange >= minStabilityMs && last > 0) || (now - start >= timeoutMs)){
+          ro.disconnect(); resolve();
+        } else { requestAnimationFrame(check); }
+      })();
+    });
+  }
+
+  try { await document.fonts?.ready; } catch(_) {}
+  await waitForStableSize(container.node());
+
+  // (Por si algo cambió antes de animar)
+  relayout();
+
+  // Observer + fallback para cambios posteriores
+  const ro = new ResizeObserver(() => relayout());
+  ro.observe(container.node());
+  window.addEventListener("resize", () => relayout(), { passive: true });
 });
