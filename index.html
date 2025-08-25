@@ -14,14 +14,28 @@
   <!-- DASHBOARD GRID -->
   <main class="dash-grid">
 
-    <!-- Card grande izquierda -->
-    <section class="card card-xl">
-      <header class="card-hd">
-        <h2>Clasificación de páginas webs según su actividad en línea</h2>
-      </header>
-      <div class="card-bd">
-        <div id="sunburst-chart"></div>
-      </div>
+
+    <div class="row two-cols">
+      <!-- Izquierda: Sunburst -->
+      <section class="card sunburst-card">
+        <header class="card-hd">
+          <h2>Clasificación de páginas webs según su actividad en línea</h2>
+        </header>
+        <div class="card-bd">
+          <div id="sunburst-chart"></div>
+        </div>
+      </section>
+
+      <!-- Derecha: Semidonut -->
+      <section class="card semidonut-card">
+        <header class="card-hd"><h3>Total de páginas web</h3></header>
+        <div class="card-bd"><div id="semi-donut"></div></div>
+      </section>
+    </div>
+
+    <section class="card">
+      <header class="card-hd"><h3>Economic Footprint por categoría</h3></header>
+      <div class="card-bd"><div id="footprint"></div></div>
     </section>
 
     <!-- Cards pequeñas -->
@@ -31,6 +45,18 @@
         <div id="stacked-chart">
           <!-- placeholder usado por el script -->
           <div id="stacked-selector" style="text-align:center;margin-bottom:.75rem;"></div>
+        </div>
+      </div>
+    </section>
+
+
+    <section class="card">
+      <header class="card-hd"><h3>Tendencia del Heartbeat</h3></header>
+      <div class="card-bd">
+        <div id="linechart-categoria">
+          <!-- placeholders usados por el script -->
+          <div id="linechart-selector"></div>
+          <div id="linechart-categoria-svg"></div>
         </div>
       </div>
     </section>
@@ -45,33 +71,12 @@
       <div class="card-bd"><div id="line-chart-container"></div></div>
     </section> -->
 
-    <section class="card">
-      <header class="card-hd"><h3>Tendencia del Heartbeat</h3></header>
-      <div class="card-bd">
-        <div id="linechart-categoria">
-          <!-- placeholders usados por el script -->
-          <div id="linechart-selector"></div>
-          <div id="linechart-categoria-svg"></div>
-        </div>
-      </div>
-    </section>
-
     <section class="card card-wide">
       <header class="card-hd"><h3>Chatbots en páginas .gob.pe</h3></header>
       <div class="card-bd"><div id="chatbot-chart"></div></div>
     </section>
 
-    <section class="card">
-      <header class="card-hd"><h3>Economic Footprint por categoría</h3></header>
-      <div class="card-bd"><div id="footprint"></div></div>
-    </section>
 
-
-
-    <section class="card">
-      <header class="card-hd"><h3>Semicírculo de páginas</h3></header>
-      <div class="card-bd"><div id="semi-donut"></div></div>
-    </section>
 
   </main>
 
